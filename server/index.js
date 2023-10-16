@@ -2,11 +2,15 @@
 
 const env = require('dotenv');
 
-// ORDER OF THE ENV FILES MATTERS
-env.config({path: '.env.default'});
-env.config({path: '.env'})
+// ORDER OF THE ENV FILES MATTERS - existing environment takes precedence, then
+// earlier files over later ones. Note that running it with docker compose,
+// these files have no effect because docker-compose has already applied them
+// to the local envirmonment as part of "...compose up".
+env.config({path: '.env', debug: true})
+env.config({path: '.env.default', debug: true});
 
 const { debug } = require('./utils');
+
 const Koa = require('koa');
 const cors = require('@koa/cors');
 const Router = require('koa-router');
@@ -20,6 +24,7 @@ const v0Router = require('./v0-routes');
 const v1Router = require('./v1-routes');
 const v2Router = require('./v2-routes');
 const v3Router = require('./v3-routes');
+const v4Router = require('./v4-routes');
 
 const HTTP_PORT = process.env.HTTP_PORT || 80;
 const HTTPS_PORT = process.env.HTTPS_PORT || 443;
@@ -61,6 +66,11 @@ const invite = `<!DOCTYPE html>
 
 const router = new Router();
 
+router.get('/robots.txt', async ctx => {
+    ctx.type = 'text/plain'
+    ctx.body = "User-agent: *\nDisallow: /";
+});
+
 router.get('/', async ctx => {
   debug(`text: ${invite}`);
   ctx.type = 'html';
@@ -89,6 +99,11 @@ app.use(v2Router.allowedMethods());
 
 app.use(v3Router.routes());
 app.use(v3Router.allowedMethods());
+
+// handle v4 protected routes
+
+app.use(v4Router.routes());
+app.use(v4Router.allowedMethods());
 
 // start service
 
