@@ -3,7 +3,7 @@ version: "2.3"
 services:
 
   dev:
-    image: ${DOCKER_IMAGE:-approov2/shapes-node-koa:dev}
+    image: ${DOCKER_IMAGE:-approov/demo-approov-io-shapes-api/main:dev}
     build: .
     env_file:
       # ORDER OF THE ENV FILES MATTERS - definitions in later files override
@@ -20,7 +20,7 @@ services:
       - default
 
   node:
-    image: ${DOCKER_IMAGE:-approov2/shapes-node-koa}
+    image: ${DOCKER_IMAGE:-approov/demo-approov-io-shapes-api/main}
     build: .
     restart: always
     env_file:
@@ -33,10 +33,10 @@ services:
       - traefik
     labels:
       - "traefik.enable=true"
-      - "traefik.backend=${PUBLIC_DOMAIN? Missing value for: PUBLIC_DOMAIN}"
+      - "traefik.backend=${PUBLIC_DOMAIN:-shapes.demo.approov.io,shapes.approov.io}"
       - "traefik.docker.network=traefik"
       - "traefik.port=${HTTP_PORT:-8002}"
-      - "traefik.frontend.rule=Host:${PUBLIC_DOMAIN}"
+      - "traefik.frontend.rule=Host:${PUBLIC_DOMAIN:-shapes.demo.approov.io,shapes.approov.io}"
 
 networks:
   traefik:
