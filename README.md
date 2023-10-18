@@ -13,7 +13,7 @@ Git clone this repo into the home folder `/home/ec2-user` and change to the newl
 git clone https://github.com/CriticalBlue/demo-approov-io-shapes-api.git && cd demo-approov-io-shapes-api
 ```
 
-Copy `.env.example` to `.env` and customize it. The environment variables are used (TODO: among others) to set the Traefik configuration in the `docker-compose.yml` file at the service `node`. The only configuration required is the Approov token signing secret for the demo account.
+Copy `.env.example` to `.env` and customize it. The only configuration required is the Approov token signing secret for the demo account.
 
 Get the Approov secret using the Approov CLI:
 ```bash
