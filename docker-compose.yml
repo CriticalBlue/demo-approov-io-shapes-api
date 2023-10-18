@@ -3,12 +3,14 @@ version: "2.3"
 services:
 
   dev:
-    image: ${DOCKER_IMAGE:-approov/demo-approov-io-shapes-api/main:dev}
-    build: .
+    image: ${DOCKER_IMAGE:-approov/demo-approov-io-shapes-api/${BUILD_RELEASE_FROM:-main}:dev}
+    build:
+      context: .
+      args:
+        BUILD_RELEASE_FROM: ${BUILD_RELEASE_FROM:-main} # pass through to container from .env file
     env_file:
-      # ORDER OF THE ENV FILES MATTERS - definitions in later files override
-      # earlier ones. No environment variables are inherited from the host
-      # environment
+      # ORDER OF THE ENV FILES MATTERS - definitions in later files override earlier ones.
+      # No environment variables are inherited from the host environment.
       - .env.default
       - .env
     working_dir: "/home/node/app"
@@ -20,13 +22,15 @@ services:
       - default
 
   node:
-    image: ${DOCKER_IMAGE:-approov/demo-approov-io-shapes-api/main}
-    build: .
+    image: ${DOCKER_IMAGE:-approov/demo-approov-io-shapes-api/${BUILD_RELEASE_FROM:-main}}
+    build:
+      context: .
+      args:
+        BUILD_RELEASE_FROM: ${BUILD_RELEASE_FROM:-main} # pass through to container from .env file
     restart: always
     env_file:
-      # ORDER OF THE ENV FILES MATTERS - definitions in later files override
-      # earlier ones. No environment variables are inherited from the host
-      # environment
+      # ORDER OF THE ENV FILES MATTERS - definitions in later files override earlier ones.
+      # No environment variables are inherited from the host environment.
       - .env.default
       - .env
     networks:

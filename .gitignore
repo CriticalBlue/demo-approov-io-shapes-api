@@ -63,7 +63,9 @@ typings/
 
 # dotenv environment variables file
 .env
-.env.docker
+.env.*
+!.env.default
+!.env.example
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -89,5 +91,3 @@ typings/
 .Trash-1000/
 
 .local/
-.env.*
-!.env.sample

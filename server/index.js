@@ -56,13 +56,21 @@ app.use(async (ctx, next) => {
 
 // handle default route
 
-const invite = `<!DOCTYPE html>
-  <html><body>
-    <h1>Approov Mobile App Authentication</h1>
-    <P>To learn more about how Approov protects your APIs from
-    malicious bots and tampered or fake apps, see
-    <a href="https://approov.io/docs">https://approov.io/docs</a>.</p>
-  </body></html>`;
+const invite = `
+  <!DOCTYPE html>
+    <html>
+      <head>
+        <meta name="robots" content="noindex">
+      </head>
+      <body>
+        <h1>Approov Mobile App Authentication</h1>
+        <p>
+          To learn more about how Approov protects your APIs from malicious bots and tampered or fake apps, see
+          <a href="https://approov.io">https://approov.io</a>.
+        </p>
+      </body>
+    </html>
+`;
 
 const router = new Router();
 
