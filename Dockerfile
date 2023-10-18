@@ -30,7 +30,7 @@ WORKDIR "${APP_DIR}"
 
 # Clone the repo and check out the selected branch
 RUN \
-  git clone https://github.com/CriticalBlue/demo-approov-io-shapes-api.git . && \
+  git clone https://github.com/criticalblue/demo-approov-io-shapes-api.git . && \
   git checkout "${BUILD_RELEASE_FROM}" && \
   ls -al
 

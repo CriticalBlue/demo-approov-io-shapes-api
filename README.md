@@ -10,7 +10,7 @@ This guide assumes that you are logged in to the EC2 server that you set up by f
 Git clone this repo into the home folder `/home/ec2-user` and change to the newly created directory:
 
 ```console
-git clone https://github.com/CriticalBlue/demo-approov-io-shapes-api.git && cd demo-approov-io-shapes-api
+git clone https://github.com/criticalblue/demo-approov-io-shapes-api.git && cd demo-approov-io-shapes-api
 ```
 
 Copy `.env.example` to `.env` and customize it. The only configuration required is the Approov token signing secret for the demo account.
