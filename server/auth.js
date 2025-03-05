@@ -1,10 +1,10 @@
-// shapes api server
+// shapes api server - Approov token verification
 
-const { debug } = require('./utils');
-const crypto = require('crypto');
-const jwt = require('jsonwebtoken');
-const { registerDeviceWithValue, getDeviceValue, resetDeviceValue } = require('./device-register');
-const { decodeObjectFromListOfListsJsonUtf8B64url: decodePayload, encodeListOfListsJsonUtf8B64urlFromObject: encodePayload } = require('./custom-payload')
+import { debug } from './utils.js';
+import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
+import { registerDeviceWithValue, getDeviceValue, resetDeviceValue } from './device-register.js';
+import { decodeObjectFromListOfListsJsonUtf8B64url as decodePayload, encodeListOfListsJsonUtf8B64urlFromObject as encodePayload } from './custom-payload.js';
 
 const APPROOV_SECRET=Buffer.from(process.env.APPROOV_SECRET || '', 'base64');
 const ALLOW_DEBUG_TOKENS = process.env.ALLOW_DEBUG_TOKENS === 'true';
@@ -153,6 +153,4 @@ const verifyCustomPayloadWithToken = (ctx, registerNewDevice) => {
   return {valid: true, status: 'device pass; matching token'};
 }
 
-module.exports = { verifyToken, verifyApproovAuthTokenBinding, verifyCustomPayloadWithToken };
-
-// end of file
+export { verifyToken, verifyApproovAuthTokenBinding, verifyCustomPayloadWithToken };

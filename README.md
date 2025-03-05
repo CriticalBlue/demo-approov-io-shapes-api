@@ -66,6 +66,10 @@ Build the docker container:
 docker-compose build dev
 ```
 
+**Troubleshooting:**
+1. To fix `open /Users/YOUR-USER-NAME/.docker/buildx/current: permission denied` on Mac, execute `sudo chown -R $(whoami) ~/.docker`
+2. To fix `ERROR [dev internal] load metadata for docker.io/library/node:18-slim`, execute `docker pull node:18-slim`.
+
 Run the shapes server:
 ```bash
 docker-compose up --detach dev

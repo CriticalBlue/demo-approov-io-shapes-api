@@ -1,4 +1,4 @@
-const { debug } = require('./utils');
+import { debug } from './utils.js';
 
 const API_KEY=process.env.API_KEY || '';
 
@@ -19,4 +19,4 @@ const verifyApiKey = (ctx) => {
   return { valid: false, status: 'invalid api key' };
 }
 
-module.exports = { verifyApiKey };
+export { verifyApiKey };

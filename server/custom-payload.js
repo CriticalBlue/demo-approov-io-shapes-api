@@ -1,12 +1,8 @@
-// shapes api server
+// shapes api server - custom payload
 
-const { debug } = require('./utils');
-//const base64url = require('base64url');
-
+import { debug } from './utils.js';
 
 const decodeB64urlUtf8 = (b64urlDataString) => {
-  // old form - will need require above
-  //base64url.decode(b64urlDataString);
   try {
     const dataBuf = Buffer.from(b64urlDataString, 'base64url');
     const dataString = dataBuf.toString();
@@ -23,8 +19,6 @@ const encodeB64urlUtf8 = (dataString) => {
   const b64urlDataString = dataBuff.toString('base64url');
   debug(`succeeded base64url encode: ${dataString} -> ${b64urlDataString}`)
   return { valid: true, status: `succeeded base64url encode`, data: b64urlDataString };
-  // old form - will need require above and be *something like*
-  //base64url.encode(b64urlDataString);
 }
 
 const decodeJsonB64urlUtf8 = (b64urlDataString) => {
@@ -90,6 +84,4 @@ const encodeListOfListsJsonUtf8B64urlFromObject = (data, keys) => {
   return encodeJsonB64urlUtf8(headerList)
 }
 
-module.exports = { decodeObjectFromListOfListsJsonUtf8B64url, encodeListOfListsJsonUtf8B64urlFromObject };
-
-// end of file
+export { decodeObjectFromListOfListsJsonUtf8B64url, encodeListOfListsJsonUtf8B64urlFromObject };

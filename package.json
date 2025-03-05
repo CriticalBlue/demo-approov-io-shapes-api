@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Approov2 shapes API server example",
   "author": "Skip Hovsmith",
+  "type": "module",
   "license": "Apache-2.0",
   "licenseFilename": "LICENSE",
   "main": "server/index.js",
@@ -11,7 +12,8 @@
     "test": "NODE_TLS_REJECT_UNAUTHORIZED=0 jest --watchAll"
   },
   "dependencies": {
-    "@koa/cors": "^3.1.0",
+    "@koa/cors": "^5.0.0",
+    "@misskey-dev/node-http-message-signatures": "github:misskey-dev/node-http-message-signatures",
     "dotenv": "^16.0.0",
     "jsonwebtoken": "^9.0.0",
     "koa": "^2.7.0",
