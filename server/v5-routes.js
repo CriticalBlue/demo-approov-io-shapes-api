@@ -3,11 +3,11 @@
 import { debug } from './utils.js';
 import Router from 'koa-router';
 import { verifyApiKey } from './api-key.js';
+// TODO support token binding and custom payload verification?
 import { verifyToken, verifyApproovAuthTokenBinding, verifyCustomPayloadWithToken } from './auth.js';
 import { verifyHTTPSig } from './http-sig.js';
 
 const ENFORCE_APPROOV = (process.env.ENFORCE_APPROOV || 'true') == 'true';
-const APPROOV_MSG_SIGN_KEY=Buffer.from(process.env.APPROOV_ACCOUNT_MSG_SIGN_SECRET || '', 'base64');
 
 // API key, approov token, and HTTP message signature checks
 
@@ -59,16 +59,14 @@ router.use('/shapes', async (ctx, next) => {
   const tokenResult = verifyToken(ctx);
   abortOnInvalidApproovToken(ctx, tokenResult);
 
-  // This is designed to work with both, account message signing and device message signing. First we check whether the 
-  // Approov token contains a public key claim. If it does, we use this to verify the HTTP signature. If it does not, we
-  // use the account message signing secret to verify the HTTP signature.
-  const pubKey = tokenResult.claims['dpk'];
-  if (!pubKey) {
-    pubKey = APPROOV_MSG_SIGN_KEY;
+  // Check whether the Approov token contains an installation public key (ipk) claim. If it does, we use this to verify
+  // the HTTP signature. If it does not, we know that the message has no signature that we should check in the demo
+  // server and accept the message.
+  const pubKey = tokenResult.claims['ipk'];
+  if (pubKey) {
+    const msgSignResult = await verifyHTTPSig(ctx, pubKey);
+    abortOnInvalidHTTPSig(ctx, msgSignResult);
   }
-
-  const msgSignResult = verifyHTTPSig(ctx, pubKey);
-  abortOnInvalidHTTPSig(ctx, msgSignResult);
 
   await next();
 });
@@ -92,7 +90,7 @@ router.get('/shapes', async ctx => {
   debug(`shape: ${shape}`);
   ctx.body = {
     shape,
-    status: `${shape} (approoved and api key valid)`
+    status: `${shape} (approoved with valid message signature)`
   };
 });
 

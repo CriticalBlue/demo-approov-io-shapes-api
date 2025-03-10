@@ -1,12 +1,10 @@
 import { debug } from './utils.js';
 
-const API_KEY=process.env.API_KEY || '';
-
 const verifyApiKey = (ctx) => {
   debug('>>> Check API Key <<<');
 
+  const API_KEY = process.env.API_KEY ?? '';
   const apiKey = ctx.headers['api-key'];
-  debug(`API KEY HEADER: ${apiKey}`);
 
   if (!apiKey) {
     return { valid: false, status: 'missing the api key in the request' };

@@ -17,9 +17,9 @@ import v4Router from './v4-routes.js';
 import v5Router from './v5-routes.js';
 
 // ORDER OF THE ENV FILES MATTERS - existing environment takes precedence, then
-// earlier files over later ones. Note that running it with docker compose,
+// earlier files over later ones. Note that when running this with docker compose,
 // these files have no effect because docker-compose has already applied them
-// to the local envirmonment as part of "...compose up".
+// to the local environment as part of "docker-compose up".
 dotenv.config({path: '.env', debug: true})
 dotenv.config({path: '.env.default', debug: true});
 
@@ -169,7 +169,4 @@ if (HTTPS_MODE == 'direct') {
 }
 
 // export service close function
-module.exports = {
-  httpServer,
-  httpsServer
-}
+export { httpServer, httpsServer };

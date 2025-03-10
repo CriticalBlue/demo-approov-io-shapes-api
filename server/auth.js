@@ -6,7 +6,6 @@ import jwt from 'jsonwebtoken';
 import { registerDeviceWithValue, getDeviceValue, resetDeviceValue } from './device-register.js';
 import { decodeObjectFromListOfListsJsonUtf8B64url as decodePayload, encodeListOfListsJsonUtf8B64urlFromObject as encodePayload } from './custom-payload.js';
 
-const APPROOV_SECRET=Buffer.from(process.env.APPROOV_SECRET || '', 'base64');
 const ALLOW_DEBUG_TOKENS = process.env.ALLOW_DEBUG_TOKENS === 'true';
 
 const approovTokenHeader = 'Approov-Token'.toLowerCase();
@@ -15,6 +14,7 @@ const authenticationHeader = 'Authorization'.toLowerCase();
 const verifyToken = (ctx, payClaimData) => {
   debug('>>> Check Approov token <<<');
 
+  const APPROOV_SECRET=Buffer.from(process.env.APPROOV_SECRET || '', 'base64');
   const approovToken = ctx.headers[approovTokenHeader];
   if (!approovToken) {
     return { valid: false, status: 'missing approov token' };

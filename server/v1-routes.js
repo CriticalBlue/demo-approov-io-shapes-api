@@ -1,4 +1,4 @@
-// shapes api server - v2 api key protected routes
+// shapes api server - v1 API key protected routes
 
 import { debug } from './utils.js';
 import Router from 'koa-router';

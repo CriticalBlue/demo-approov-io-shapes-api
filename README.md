@@ -94,6 +94,72 @@ Stop the shapes server:
 docker-compose down
 ```
 
+## Testing the Approov Shapes Server with Curl on Localhost
+
+### Unprotected Endpoints
+
+```shell
+curl -X GET 'http://localhost:8002/hello'
+```
+
+Expected response: `Hello, World!`
+
+```shell
+curl -X GET 'http://localhost:8002/shapes'
+```
+
+Expected response: `Rectangle` (or another valid shape).
+
+### /v1 - API-Key Protected
+
+This test requires the API-Key in the header to match the API_KEY entry in the `.env` file (except for the hello endpoint which is always unprotected).
+
+```shell
+curl -X GET 'http://localhost:8002/v1/hello'
+```
+
+Expected response: `{"text":"Hello, World!","status":"Hello, World!"}`
+
+```shell
+curl -H "API-Key: yXClypapWNHIifHUWmBIyPFAm" -X GET 'http://localhost:8002/v1/shapes'
+```
+
+Expected response: `{"shape":"Rectangle","status":"Rectangle (api key protected)"}` (or another valid shape).
+
+```shell
+curl -H "API-Key: yXClypapWNHIifHUWmBIyPFAm" -X GET 'http://localhost:8002/v1/forms'
+```
+
+Expected response: `{"form":"Box","status":"Box (api key protected)"}` (or another valid solid).
+
+### /v2 - Approov Token Protected
+
+This test requires the APPROOV_SECRET entry in the `.env` file to match the Approov secret of the demo account (except for the hello endpoint which is always unprotected). The demo Approov secret can be retrieved using the Approov CLI: `` eval `approov role admin demo` ``, followed by `approov secret -get base64`. Check that the command `approov token -genExample shapes.approov.io` returns an example token as expected before issuing any `curl` command that uses it.
+
+```shell
+curl -X GET 'http://localhost:8002/v2/hello'
+```
+
+Expected response: `{"text":"Hello, World!","status":"Hello, World! (healthy)"}`
+
+```shell
+curl -H "Approov-Token: $(approov token -genExample shapes.approov.io)" -X GET 'http://localhost:8002/v2/shapes'
+```
+
+Expected response: `{"shape":"Rectangle","status":"Rectangle (api key protected)"}` (or another valid shape).
+
+```shell
+curl -H "Approov-Token: $(approov token -genExample shapes.approov.io)" -X GET 'http://localhost:8002/v2/forms'
+```
+
+Expected response: `{"form":"Box","status":"Box (api key protected)"}` (or another valid solid).
+
+### /v3 - TODO
+
+### /v4 - TODO
+
+### /v5 - TODO
+
 ## Testing the Approov Shapes Server with the Postman Collection
 
 ### Configuring the Environment
