@@ -2,6 +2,7 @@
 
 import { debug } from './utils.js';
 import Router from 'koa-router';
+// TODO remove API key check?
 import { verifyApiKey } from './api-key.js';
 // TODO support token binding and custom payload verification?
 import { verifyToken, verifyApproovAuthTokenBinding, verifyCustomPayloadWithToken } from './auth.js';
