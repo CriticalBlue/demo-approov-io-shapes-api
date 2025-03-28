@@ -45,6 +45,7 @@ const verifyHTTPSig = async (ctx, publicKey) => {
     try {
         // pass the node request object (ctx.req), *not* the Koa request object (ctx.request)
         parsedSignature = parseRequestSignature(ctx.req);
+        debug(`Parsed Signature: ${JSON.stringify(parsedSignature, null, 2)}`);
     } catch (error) {
         debug(`Malformed message signature: ${error}`);
         debug(`Request Headers: ${JSON.stringify(ctx.req.headers, null, 2)}`);
@@ -55,6 +56,7 @@ const verifyHTTPSig = async (ctx, publicKey) => {
     try {
         const signatureVerified = await verifyParsedSignature(parsedSignature, publicKeyPEM, (...args) => debug(args));
         if (!signatureVerified) {
+            debug(`Request Headers: ${JSON.stringify(ctx.req.headers, null, 2)}`);
             return { valid: false, status: 'invalid message signature' };
         }
     } catch (error) {
