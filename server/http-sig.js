@@ -28,14 +28,16 @@ const verifyHTTPSig = async (ctx, publicKey) => {
     // });
     // const publicKeyObject = createPublicKey(publicKeyBuffer);
     const publicKeyPEM = `-----BEGIN PUBLIC KEY-----\n${publicKeyBuffer.toString('base64').match(/.{1,64}/g).join('\n')}\n-----END PUBLIC KEY-----\n`;
-    console.log('Public Key PEM:', publicKeyPEM);
-    console.log('Public Key ASN.1 Base64:', publicKey);
+    debug(`Public Key ASN.1 Base64: ${publicKey}`);
+    debug(`Public Key PEM: ${publicKeyPEM}`);
     
-    // Check the digest header (pass the node request object (ctx.req), *not* the Koa request object (ctx.request))
-    const requestBody = ctx.body || '';
-    const digestVerified = await verifyDigestHeader(ctx.req, requestBody, true, (...args) => debug(args));
-    if (!digestVerified) {
-        return { valid: false, status: 'invalid digest header' };
+    // Check the digest header if it exists (pass the node request object (ctx.req), *not* the Koa request object (ctx.request))
+    if (ctx.req.headers['content-digest'] || ctx.req.headers['digest']) {
+        const requestBody = ctx.body || '';
+        const digestVerified = await verifyDigestHeader(ctx.req, requestBody, true, (...args) => debug(args.map(arg => JSON.stringify(arg)).join(' ')));
+        if (!digestVerified) {
+            return { valid: false, status: 'invalid digest header' };
+        }
     }
 
     // Check the signature
