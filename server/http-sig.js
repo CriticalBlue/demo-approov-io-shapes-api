@@ -64,6 +64,7 @@ const verifyHTTPSig = async (ctx, publicKey) => {
         debug(`Request Headers: ${JSON.stringify(ctx.req.headers, null, 2)}`);
         return { valid: false, status: 'message signature error' };
     }
+    debug(`Request Headers: ${JSON.stringify(ctx.req.headers, null, 2)}`);
     return { valid: true, status: 'valid HTTP message signature' };
 }
 
