@@ -58,4 +58,20 @@ describe('v4 payload checks', () => {
     expect(response.status).toBe(400);
     expect(response.body.status).toBe('device fail; updated token');
   });
+
+  test('rejects registration tokens without a device id claim', async () => {
+    const json = JSON.stringify([['id', 'device-without-claim']]);
+    const token = jwt.sign({
+      pay: crypto.createHash('sha256').update(json).digest('base64')
+    }, secret, { expiresIn: '1h' });
+
+    const response = await request(server)
+      .post('/v4/register')
+      .set('Api-Key', apiKey)
+      .set('Approov-Token', token)
+      .set('Pay-Content', Buffer.from(json).toString('base64url'));
+
+    expect(response.status).toBe(400);
+    expect(response.body.status).toBe('device fail; missing device id');
+  });
 });
