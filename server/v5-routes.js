@@ -1,6 +1,6 @@
 // shapes api server - v5 protected routes
 
-import { debug } from './utils.js';
+import { debug, readBooleanEnv } from './utils.js';
 import Router from 'koa-router';
 // TODO remove API key check?
 import { verifyApiKey } from './api-key.js';
@@ -8,7 +8,7 @@ import { verifyApiKey } from './api-key.js';
 import { verifyToken, verifyApproovAuthTokenBinding, verifyCustomPayloadWithToken } from './auth.js';
 import { verifyHTTPSig } from './http-sig.js';
 
-const ENFORCE_APPROOV = (process.env.ENFORCE_APPROOV || 'true') == 'true';
+const ENFORCE_APPROOV = readBooleanEnv('ENFORCE_APPROOV', true);
 
 // API key, approov token, and HTTP message signature checks
 
