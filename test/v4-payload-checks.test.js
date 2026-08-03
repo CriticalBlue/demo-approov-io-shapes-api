@@ -58,4 +58,11 @@ describe('v4 payload checks', () => {
     expect(response.status).toBe(400);
     expect(response.body.status).toBe('device fail; updated token');
   });
+
+  test('rejects a registration token without a device id', async () => {
+    const response = await register(undefined, [['id', 'device-missing-claim']]);
+
+    expect(response.status).toBe(400);
+    expect(response.body.status).toBe('device fail; missing device id');
+  });
 });

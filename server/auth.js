@@ -124,12 +124,16 @@ const verifyCustomPayloadWithToken = (ctx, registerNewDevice) => {
   if (!tokenResult.valid) {
     return tokenResult;
   }
+  const deviceId = tokenResult.claims.did;
+  if (typeof deviceId !== 'string' || deviceId.length === 0) {
+    return { valid: false, status: 'device fail; missing device id' };
+  }
   // check for register new device flag and set it up with at least the current token
   if (registerNewDevice) {
-    registerDeviceWithValue(tokenResult.claims.did, {pass: true, token: tokenResult.token})
+    registerDeviceWithValue(deviceId, {pass: true, token: tokenResult.token})
   }
   // Retrieve the registered device properties
-  const deviceResult = getDeviceValue(tokenResult.claims.did);
+  const deviceResult = getDeviceValue(deviceId);
   if (!deviceResult) {
     return { valid: false, status: 'device fail; not registered' };
   }
@@ -139,7 +143,7 @@ const verifyCustomPayloadWithToken = (ctx, registerNewDevice) => {
     const [newDeviceResult, payloadResponse] = processPayloadResults(payloadResult.keys, payloadResult.data)
     // add the raw token to the result for future matching
     newDeviceResult.token = tokenResult.token;
-    resetDeviceValue(tokenResult.claims.did, newDeviceResult);
+    resetDeviceValue(deviceId, newDeviceResult);
     // add the response header to the generated value whether or not the
     // payload result check was successful
     ctx.set(CUSTOM_PAYLOAD_RESPONSE_HEADER, payloadResponse)
