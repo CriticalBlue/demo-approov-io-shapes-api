@@ -73,12 +73,22 @@ const verifyApproovAuthTokenBinding = (ctx) => {
   return verifyToken(ctx, authData);
 }
 
-const processPayloadResults = (keys, data, lastDeviceResult) => {
+const payloadCheckers = [
+  (data, responseData) => {
+    if (typeof data.id !== 'string' || data.id.length === 0) {
+      return false;
+    }
+    responseData.id = data.id;
+    return true;
+  }
+];
+
+const processPayloadResults = (keys, data) => {
   const deviceResult = {pass: true};
-  const responseData = {id:data.id};
-  for (const [idx, checker] of [].entries()) {
+  const responseData = {};
+  for (const [idx, checker] of payloadCheckers.entries()) {
     if (!checker(data, responseData)) {
-      debug('checker@${idx} caused failure');
+      debug(`checker@${idx} caused failure`);
       deviceResult.pass = false;
     }
   }
@@ -126,7 +136,7 @@ const verifyCustomPayloadWithToken = (ctx, registerNewDevice) => {
 
   // now check the rest of the payload properties if they are present
   if (payloadResult) {
-    const [newDeviceResult, payloadResponse] = processPayloadResults(payloadResult.keys, payloadResult.data, deviceResult)
+    const [newDeviceResult, payloadResponse] = processPayloadResults(payloadResult.keys, payloadResult.data)
     // add the raw token to the result for future matching
     newDeviceResult.token = tokenResult.token;
     resetDeviceValue(tokenResult.claims.did, newDeviceResult);
