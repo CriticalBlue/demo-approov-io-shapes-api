@@ -8,7 +8,13 @@ const decodeB64urlUtf8 = (b64urlDataString) => {
   // old form - will need require above
   //base64url.decode(b64urlDataString);
   try {
+    if (typeof b64urlDataString !== 'string' || !/^[A-Za-z0-9_-]+$/.test(b64urlDataString)) {
+      return { valid: false, status: `failed base64url decode` };
+    }
     const dataBuf = Buffer.from(b64urlDataString, 'base64url');
+    if (dataBuf.toString('base64url') !== b64urlDataString) {
+      return { valid: false, status: `failed base64url decode` };
+    }
     const dataString = dataBuf.toString();
     debug(`succeeded base64url decode: ${dataString}`)
     return { valid: true, status: 'decoded base64url data', data: dataString };
@@ -55,19 +61,24 @@ const decodeObjectFromListOfListsJsonUtf8B64url = (b64urlDataString) => {
   }
 
   const decodedData = decodedResult.data
-  if (typeof decodedData !== 'object' || !decodedData.length) {
+  if (!Array.isArray(decodedData) || decodedData.length === 0) {
     debug('failed outer list conversion, empty list')
     return { valid: false, status: `failed outer list conversion, empty list` };
   }
 
   const keys = [];
-  const resultData = {};
-  for (const [key, val] of decodedData) {
-    if (!typeof key === 'string' || !typeof val === 'string' || key === '' ) {
+  const resultData = Object.create(null);
+  for (const entry of decodedData) {
+    if (!Array.isArray(entry) || entry.length !== 2) {
+      debug(`failed inner list conversion after ${keys.length} elements: pair check`)
+      return { valid: false, status: `failed inner list conversion: pair check` };
+    }
+    const [key, val] = entry;
+    if (typeof key !== 'string' || typeof val !== 'string' || key === '' ) {
       debug(`failed inner list conversion after ${keys.length} elements: key/value check`)
       return { valid: false, status: `failed inner list conversion: key/value check` };
     }
-    if (resultData.hasOwnProperty(key)) {
+    if (Object.prototype.hasOwnProperty.call(resultData, key)) {
       debug(`failed inner list conversion after ${keys.length} elements: duplicate property ${key}`)
       return { valid: false, status: 'failed inner list conversion: duplicate property' };
     }
@@ -80,7 +91,7 @@ const decodeObjectFromListOfListsJsonUtf8B64url = (b64urlDataString) => {
 const encodeListOfListsJsonUtf8B64urlFromObject = (data, keys) => {
   const headerList = [];
   for (const key of keys) {
-    if (data.hasOwnProperty(key)) {
+    if (Object.prototype.hasOwnProperty.call(data, key)) {
       const value = data[key];
       if (typeof value === 'string' && value !== '') {
         headerList.push([key, value]);
