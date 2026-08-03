@@ -1,4 +1,4 @@
-ARG TAG=18-slim
+ARG TAG=24-slim
 FROM node:${TAG}
 
 # Branch to check out for the build
@@ -11,8 +11,7 @@ USER root
 RUN \
   apt update && \
   apt -y upgrade && \
-  apt -y install git && \
-  npm install pm2 -g
+  apt -y install git
 
 ENV USER="node"
 ENV HOME="/home/${USER}"
@@ -37,4 +36,4 @@ RUN \
 RUN npm install
 
 # Start the app
-CMD [ "pm2-runtime", "server/index.js" ]
+CMD [ "node", "server/index.js" ]

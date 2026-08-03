@@ -1,7 +1,7 @@
 // shapes api server - unprotected routes
 
 import { debug } from './utils.js';
-import Router from 'koa-router';
+import Router from '@koa/router';
 
 // handle routes
 

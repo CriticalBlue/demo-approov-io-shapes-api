@@ -1,7 +1,7 @@
 // shapes api server - v1 API key protected routes
 
 import { debug } from './utils.js';
-import Router from 'koa-router';
+import Router from '@koa/router';
 import { verifyApiKey } from './api-key.js';
 
 const abortOnInvalidApiKey = (ctx) => {

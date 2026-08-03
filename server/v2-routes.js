@@ -1,7 +1,7 @@
 // shapes api server - v2 protected routes
 
 import { debug, readBooleanEnv } from './utils.js';
-import Router from 'koa-router';
+import Router from '@koa/router';
 import { verifyToken, verifyApproovAuthTokenBinding } from './auth.js';
 
 const ENFORCE_APPROOV = readBooleanEnv('ENFORCE_APPROOV', true);

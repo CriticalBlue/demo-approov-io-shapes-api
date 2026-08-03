@@ -1,7 +1,7 @@
 // shapes api server - v4 protected routes
 
 import { debug, readBooleanEnv } from './utils.js';
-import Router from 'koa-router';
+import Router from '@koa/router';
 import { verifyApiKey } from './api-key.js';
 import { verifyToken, verifyApproovAuthTokenBinding, verifyCustomPayloadWithToken } from './auth.js';
 

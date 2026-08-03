@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import { debug } from './utils.js';
 import Koa from 'koa';
 import cors from '@koa/cors';
-import Router from 'koa-router';
+import Router from '@koa/router';
 import logger from 'koa-logger';
 import sslifyPackage, { xForwardedProtoResolver as xfpResolver } from 'koa-sslify';
 import http from 'http';

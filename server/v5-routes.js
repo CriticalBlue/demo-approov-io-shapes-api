@@ -1,7 +1,7 @@
 // shapes api server - v5 protected routes
 
 import { debug, readBooleanEnv } from './utils.js';
-import Router from 'koa-router';
+import Router from '@koa/router';
 // TODO remove API key check?
 import { verifyApiKey } from './api-key.js';
 // TODO support token binding and custom payload verification?
