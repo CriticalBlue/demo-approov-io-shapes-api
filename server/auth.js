@@ -45,13 +45,12 @@ const verifyToken = (ctx, payClaimData) => {
     const payClaimValue = claims['pay'];
     if (!payClaimValue) {
       debug('missing pay claim in Approov; binding comparison ignored');
-      return { valid: false, status: 'approov token has no pay claim' };
-    }
-
-    const payClaimDataHash = crypto.createHash('sha256').update(payClaimData).digest('base64');
-    if (payClaimValue !== payClaimDataHash) {
-      debug(`approov-pay-claim mismatch: claim ${payClaimValue} != data hash ${payClaimDataHash}`);
-      return { valid: false, status: 'approov token pay claim mismatch' };
+    } else {
+      const payClaimDataHash = crypto.createHash('sha256').update(payClaimData).digest('base64');
+      if (payClaimValue !== payClaimDataHash) {
+        debug(`approov-pay-claim mismatch: claim ${payClaimValue} != data hash ${payClaimDataHash}`);
+        return { valid: false, status: 'approov token pay claim mismatch' };
+      }
     }
   }
   return { valid: true, status: 'valid approov token', token: approovToken, claims: claims };
