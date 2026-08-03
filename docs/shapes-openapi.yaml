@@ -6,6 +6,9 @@ info:
   description: A simple API which demonstrates API security using Approov.
   version: "2.0.0"
   title: Approov Shapes API
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
 components:
   securitySchemes:
     BearerAuth:
@@ -18,8 +21,10 @@ components:
 paths:
   /hello:
     get:
+      operationId: getHealth
       summary: Checks connection health
       description: No Approov protection is required
+      security: []
       responses:
         '200':
           description: Indicates a healthy connection
@@ -28,16 +33,18 @@ paths:
               schema:
                 type: object
                 properties:
-                  hello:
+                  text:
                     type: string
                     enum:
                       - Hello, World!
                   status:
                     type: string
                 required:
-                  - hello
+                  - text
+                  - status
   /shapes:
     get:
+      operationId: getShape
       summary: Requests a shape
       description: Requires a valid Approov token
       security:
@@ -53,14 +60,15 @@ paths:
                   shape:
                     type: string
                     enum:
-                      - circle
-                      - rectangle
-                      - square
-                      - triangle
+                      - Circle
+                      - Rectangle
+                      - Square
+                      - Triangle
                   status:
                     type: string
                 required:
                   - shape
+                  - status
         '400':
           description: Indicates a bad request
           content:
@@ -72,11 +80,12 @@ paths:
                     type: string
   /forms:
     get:
+      operationId: getForm
       summary: Requests a form
       description: Requires a valid and optionally bound Approov token
       security:
         - BearerAuth: []
-        - ApproovAuth: []
+          ApproovAuth: []
       responses:
         '200':
           description: Returns a random form name
@@ -88,14 +97,15 @@ paths:
                   form:
                     type: string
                     enum:
-                      - box
-                      - cone
-                      - cube
-                      - sphere
+                      - Box
+                      - Cone
+                      - Cube
+                      - Sphere
                   status:
                     type: string
                 required:
-                  - shape
+                  - form
+                  - status
         '400':
           description: Indicates a bad request
           content:
