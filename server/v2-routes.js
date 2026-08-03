@@ -1,7 +1,7 @@
 // shapes api server - v2 protected routes
 
 const { debug, readBooleanEnv } = require('./utils');
-const Router = require('koa-router');
+const Router = require('@koa/router');
 const { verifyToken, verifyApproovAuthTokenBinding } = require('./auth');
 
 const ENFORCE_APPROOV = readBooleanEnv('ENFORCE_APPROOV', true);

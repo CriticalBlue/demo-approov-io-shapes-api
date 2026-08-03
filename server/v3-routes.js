@@ -1,5 +1,5 @@
 const { debug, readBooleanEnv } = require('./utils');
-const Router = require('koa-router');
+const Router = require('@koa/router');
 const { verifyApiKey } = require('./api-key');
 const { verifyToken, verifyApproovAuthTokenBinding } = require('./auth');
 

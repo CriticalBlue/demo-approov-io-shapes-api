@@ -1,7 +1,7 @@
 // shapes api server - v2 api key protected routes
 
 const { debug } = require('./utils');
-const Router = require('koa-router');
+const Router = require('@koa/router');
 const { verifyApiKey } = require('./api-key');
 
 const abortOnInvalidApiKey = (ctx) => {

@@ -13,7 +13,7 @@ const { debug } = require('./utils');
 
 const Koa = require('koa');
 const cors = require('@koa/cors');
-const Router = require('koa-router');
+const Router = require('@koa/router');
 const logger = require('koa-logger');
 const { default: sslify, xForwardedProtoResolver: xfpResolver } = require('koa-sslify');
 const fs = require('fs');

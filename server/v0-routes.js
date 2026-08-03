@@ -1,7 +1,7 @@
 // shapes api server - v1 protected routes
 
 const { debug } = require('./utils');
-const Router = require('koa-router');
+const Router = require('@koa/router');
 
 // handle routes
 
