@@ -1,7 +1,9 @@
-const { debug } = require('./utils');
-const Router = require('koa-router');
-const { verifyApiKey } = require('./api-key');
-const { verifyToken, verifyApproovAuthTokenBinding, verifyCustomPayloadWithToken } = require('./auth');
+// shapes api server - v4 protected routes
+
+import { debug } from './utils.js';
+import Router from 'koa-router';
+import { verifyApiKey } from './api-key.js';
+import { verifyToken, verifyApproovAuthTokenBinding, verifyCustomPayloadWithToken } from './auth.js';
 
 const ENFORCE_APPROOV = (process.env.ENFORCE_APPROOV || 'true') == 'true';
 
@@ -92,4 +94,4 @@ router.get('/shapes', async ctx => {
   };
 });
 
-module.exports = router;
+export default router;

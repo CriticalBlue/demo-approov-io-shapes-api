@@ -10,6 +10,4 @@ const debug = LOG ?
 
 // const debug = (msg) => console.log('      ' + msg);
 
-module.exports = { debug };
-
-// end of file
+export { debug };

@@ -1,30 +1,27 @@
 // shapes api server
 
-const env = require('dotenv');
+import dotenv from 'dotenv';
+import { debug } from './utils.js';
+import Koa from 'koa';
+import cors from '@koa/cors';
+import Router from 'koa-router';
+import logger from 'koa-logger';
+import sslify, { xForwardedProtoResolver as xfpResolver } from 'koa-sslify';
+import http from 'http';
+import https from 'https';
+import v0Router from './v0-routes.js';
+import v1Router from './v1-routes.js';
+import v2Router from './v2-routes.js';
+import v3Router from './v3-routes.js';
+import v4Router from './v4-routes.js';
+import v5Router from './v5-routes.js';
 
 // ORDER OF THE ENV FILES MATTERS - existing environment takes precedence, then
-// earlier files over later ones. Note that running it with docker compose,
+// earlier files over later ones. Note that when running this with docker compose,
 // these files have no effect because docker-compose has already applied them
-// to the local envirmonment as part of "...compose up".
-env.config({path: '.env', debug: true})
-env.config({path: '.env.default', debug: true});
-
-const { debug } = require('./utils');
-
-const Koa = require('koa');
-const cors = require('@koa/cors');
-const Router = require('koa-router');
-const logger = require('koa-logger');
-const { default: sslify, xForwardedProtoResolver: xfpResolver } = require('koa-sslify');
-const fs = require('fs');
-const http = require('http');
-const https = require('https');
-
-const v0Router = require('./v0-routes');
-const v1Router = require('./v1-routes');
-const v2Router = require('./v2-routes');
-const v3Router = require('./v3-routes');
-const v4Router = require('./v4-routes');
+// to the local environment as part of "docker-compose up".
+dotenv.config({path: '.env', debug: true})
+dotenv.config({path: '.env.default', debug: true});
 
 const HTTP_PORT = process.env.HTTP_PORT || 80;
 const HTTPS_PORT = process.env.HTTPS_PORT || 443;
@@ -113,6 +110,11 @@ app.use(v3Router.allowedMethods());
 app.use(v4Router.routes());
 app.use(v4Router.allowedMethods());
 
+// handle v5 protected routes
+
+app.use(v5Router.routes());
+app.use(v5Router.allowedMethods());
+
 // start service
 
 let httpServer, httpsServer;
@@ -167,9 +169,4 @@ if (HTTPS_MODE == 'direct') {
 }
 
 // export service close function
-module.exports = {
-  httpServer,
-  httpsServer
-}
-
-// end of file
+export { httpServer, httpsServer };

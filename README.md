@@ -66,6 +66,10 @@ Build the docker container:
 docker-compose build dev
 ```
 
+**Troubleshooting:**
+1. To fix `open /Users/YOUR-USER-NAME/.docker/buildx/current: permission denied` on Mac, execute `sudo chown -R $(whoami) ~/.docker`
+2. To fix `ERROR [dev internal] load metadata for docker.io/library/node:18-slim`, execute `docker pull node:18-slim`.
+
 Run the shapes server:
 ```bash
 docker-compose up --detach dev
@@ -89,6 +93,109 @@ Stop the shapes server:
 ```bash
 docker-compose down
 ```
+
+## Testing the Approov Shapes Server with Curl on Localhost
+
+### Unprotected Endpoints
+
+```shell
+curl -X GET 'http://localhost:8002/hello'
+```
+
+Expected response: `Hello, World!`
+
+```shell
+curl -X GET 'http://localhost:8002/shapes'
+```
+
+Expected response: `Rectangle` (or another valid shape).
+
+### /v1 - API-Key Protected
+
+This test requires the API-Key in the header to match the API_KEY entry in the `.env` file (except for the hello endpoint which is always unprotected).
+
+```shell
+curl -X GET 'http://localhost:8002/v1/hello'
+```
+
+Expected response: `{"text":"Hello, World!","status":"Hello, World!"}`
+
+```shell
+curl -H "API-Key: yXClypapWNHIifHUWmBIyPFAm" -X GET 'http://localhost:8002/v1/shapes'
+```
+
+Expected response: `{"shape":"Rectangle","status":"Rectangle (api key protected)"}` (or another valid shape).
+
+```shell
+curl -H "API-Key: yXClypapWNHIifHUWmBIyPFAm" -X GET 'http://localhost:8002/v1/forms'
+```
+
+Expected response: `{"form":"Box","status":"Box (api key protected)"}` (or another valid solid).
+
+### /v2 - Approov Token Protected
+
+This test requires the APPROOV_SECRET entry in the `.env` file to match the Approov secret of the demo account (except for the hello endpoint which is always unprotected). The demo Approov secret can be retrieved using the Approov CLI: `` eval `approov role admin demo` ``, followed by `approov secret -get base64`. Check that the command `approov token -genExample shapes.approov.io` returns an example token as expected before issuing any `curl` command that uses it.
+
+```shell
+curl -X GET 'http://localhost:8002/v2/hello'
+```
+
+Expected response: `{"text":"Hello, World!","status":"Hello, World! (healthy)"}`
+
+```shell
+curl -H "Approov-Token: $(approov token -genExample shapes.approov.io)" -X GET 'http://localhost:8002/v2/shapes'
+```
+
+Expected response: `{"shape":"Rectangle","status":"Rectangle (approoved)"}` (or another valid shape).
+
+```shell
+curl -H "Authorization: bearer TEST" -H "Approov-Token: $(approov token -genExample shapes.approov.io -setDataHashInToken TEST)" -X GET 'http://localhost:8002/v2/forms'
+```
+
+Expected response: `{"form":"Box","status":"Box (approoved)"}` (or another valid solid).
+
+### /v3 - API Key and Approov Token Protected with Token Binding
+
+This test requires the APPROOV_SECRET entry in the `.env` file to match the Approov secret of the demo account (except for the hello endpoint which is always unprotected). The demo Approov secret can be retrieved using the Approov CLI: `` eval `approov role admin demo` ``, followed by `approov secret -get base64`. Check that the command `approov token -genExample shapes.approov.io` returns an example token as expected before issuing any `curl` command that uses it. Note that the `forms` endpoint requires the bound token to be prefixed with `bearer` in the `Authorization` header.
+
+```shell
+curl -X GET 'http://localhost:8002/v3/hello'
+```
+
+Expected response: `{"text":"Hello, World!","status":"Hello, World! (healthy)"}`
+
+```shell
+curl -H "API-Key: yXClypapWNHIifHUWmBIyPFAm" -H "Authorization: TEST" -H "Approov-Token: $(approov token -genExample shapes.approov.io -setDataHashInToken TEST)" -X GET 'http://localhost:8002/v3/shapes'
+```
+
+Expected response: `{"shape":"Rectangle","status":"Rectangle (approoved and api key valid)"}` (or another valid shape).
+
+```shell
+curl -H "API-Key: yXClypapWNHIifHUWmBIyPFAm" -H "Authorization: bearer TEST" -H "Approov-Token: $(approov token -genExample shapes.approov.io -setDataHashInToken TEST)" -X GET 'http://localhost:8002/v3/forms'
+```
+
+Expected response: `{"form":"Box","status":"Box (approoved and api key valid)"}` (or another valid solid).
+
+### /v4 - API Key and Custom Approov Token Protected
+
+```shell
+curl -X GET 'http://localhost:8002/v4/hello'
+```
+
+Expected response: `{"text":"Hello, World!","status":"Hello, World! (healthy)"}`
+
+The `shapes` and `forms` endpoints are not testable with `curl` and `approov` because the Approov CLI cannot generate an Approov token with custom claims.
+
+### /v5 - API Key, Approov Token and HTTP Message Signature Protected
+
+```shell
+curl -X GET 'http://localhost:8002/v4/hello'
+```
+
+Expected response: `{"text":"Hello, World!","status":"Hello, World! (healthy)"}`
+
+The `shapes` endpoint is not testable with `curl` and `approov` because `curl` has no support for HTTP message signing yet and
+the Approov CLI cannot generate an Approov token with a custom `ipk` claim.
 
 ## Testing the Approov Shapes Server with the Postman Collection
 

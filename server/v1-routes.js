@@ -1,8 +1,8 @@
-// shapes api server - v2 api key protected routes
+// shapes api server - v1 API key protected routes
 
-const { debug } = require('./utils');
-const Router = require('koa-router');
-const { verifyApiKey } = require('./api-key');
+import { debug } from './utils.js';
+import Router from 'koa-router';
+import { verifyApiKey } from './api-key.js';
 
 const abortOnInvalidApiKey = (ctx) => {
   const { valid, status } = verifyApiKey(ctx);
@@ -67,6 +67,4 @@ router.get('/forms', async ctx => {
   };
 });
 
-module.exports = router;
-
-// end of file
+export default router;

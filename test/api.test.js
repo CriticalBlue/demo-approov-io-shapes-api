@@ -1,11 +1,10 @@
-// shapes api tests
+// shapes api server tests
 
-const request = require('supertest');
-const fs = require('fs');
-const crypto = require('crypto');
-const jwt = require('jsonwebtoken');
+import request from 'supertest';
+import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 
-const { httpServer: server } = require('../server/index');
+import { httpServer as server } from '../server/index.js';
 
 // close the service after all tests completed
 afterAll(() => {
@@ -172,5 +171,3 @@ describe(`get ${V}/forms`, () => {
     expect(response.status).toEqual(400);
   });
 });
-
-// end of file

@@ -3,7 +3,7 @@ version: "2.3"
 services:
 
   dev:
-    image: ${DOCKER_IMAGE:-approov/demo-approov-io-shapes-api/${BUILD_RELEASE_FROM:-main}:dev}
+    image: ${DOCKER_IMAGE:-approov/demo-approov-io-shapes-api:dev}
     build:
       context: .
       args:
@@ -22,7 +22,7 @@ services:
       - default
 
   node:
-    image: ${DOCKER_IMAGE:-approov/demo-approov-io-shapes-api/${BUILD_RELEASE_FROM:-main}}
+    image: ${DOCKER_IMAGE:-approov/demo-approov-io-shapes-api}
     build:
       context: .
       args:

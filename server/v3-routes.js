@@ -1,7 +1,9 @@
-const { debug } = require('./utils');
-const Router = require('koa-router');
-const { verifyApiKey } = require('./api-key');
-const { verifyToken, verifyApproovAuthTokenBinding } = require('./auth');
+// shapes api server - v3 protected routes
+
+import { debug } from './utils.js';
+import Router from 'koa-router';
+import { verifyApiKey } from './api-key.js';
+import { verifyToken, verifyApproovAuthTokenBinding } from './auth.js';
 
 const ENFORCE_APPROOV = (process.env.ENFORCE_APPROOV || 'true') == 'true';
 
@@ -91,4 +93,4 @@ router.get('/forms', async ctx => {
   };
 });
 
-module.exports = router;
+export default router;

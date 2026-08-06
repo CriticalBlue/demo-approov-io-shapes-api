@@ -1,7 +1,7 @@
-// shapes api server - v1 protected routes
+// shapes api server - unprotected routes
 
-const { debug } = require('./utils');
-const Router = require('koa-router');
+import { debug } from './utils.js';
+import Router from 'koa-router';
 
 // handle routes
 
@@ -22,6 +22,4 @@ router.get('/shapes', async ctx => {
   ctx.body = shape;
 });
 
-module.exports = router;
-
-// end of file
+export default router;

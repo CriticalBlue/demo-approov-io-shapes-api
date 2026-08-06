@@ -1,6 +1,6 @@
 // shapes api server
 
-const { debug } = require('./utils');
+import { debug } from './utils.js';
 
 // deviceQueue holds the registered device IDs in the order they were added.
 // (A simple queue implementation using a linked list)
@@ -91,6 +91,4 @@ const resetDeviceValue = (deviceID, value) => {
   return register.set(deviceID, value);
 }
 
-module.exports = { registerDeviceWithValue, getDeviceValue, resetDeviceValue };
-
-// end of file
+export { registerDeviceWithValue, getDeviceValue, resetDeviceValue };
