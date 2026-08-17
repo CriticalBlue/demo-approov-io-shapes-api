@@ -21,13 +21,23 @@ const verifyToken = (ctx) => {
       debug('succeeded dummy approov token JSON decode');
     } catch (error) {
       debug(`failed dummy approov token JSON decode: ${error}`);
-      return { valid: false, status: 'failed dummy approov token JSON decode' };
+      return {
+        valid: false,
+        status: 'failed dummy approov token JSON decode',
+        error_name: error.name,
+        error_message: error.message
+      };
     }
   } else {
     try {
       claims = jwt.verify(approovToken, APPROOV_SECRET, {algorithms: ['HS256']});
     } catch(err) {
-      return { valid: false, status: 'invalid approov token' };
+      return {
+        valid: false,
+        status: 'invalid approov token',
+        error_name: err.name,
+        error_message: err.message
+      };
     }
   }
   return { valid: true, status: 'valid approov token', claims };

@@ -2,7 +2,7 @@
 
 import dotenv from 'dotenv';
 import { readBooleanEnv } from './utils.js';
-import { logEvent, usageTracking } from './observability.js';
+import { googleAnalyticsConfiguration, logEvent, usageTracking } from './observability.js';
 import Koa from 'koa';
 import cors from '@koa/cors';
 import Router from '@koa/router';
@@ -30,6 +30,13 @@ const ENFORCE_HTTPS=(process.env.ENFORCE_HTTPS || 'true').toLowerCase() === 'tru
 const HTTPS_MODE=(process.env.HTTPS_MODE || 'direct').toLowerCase();
 const HTTPS_KEY=Buffer.from(process.env.HTTPS_KEY || '', 'base64');
 const HTTPS_CRT=Buffer.from(process.env.HTTPS_CRT || '', 'base64');
+const analyticsConfiguration = googleAnalyticsConfiguration();
+
+logEvent(analyticsConfiguration.enabled && !analyticsConfiguration.valid ? 'error' : 'info', {
+  event: 'analytics_configuration',
+  provider: 'google_analytics',
+  ...analyticsConfiguration
+});
 
 if (!['direct', 'x-forwarded-proto'].includes(HTTPS_MODE)) {
   throw new Error(`HTTPS_MODE '${HTTPS_MODE}' not recognized`);
@@ -54,6 +61,12 @@ app.use(async (ctx, next) => {
     ctx.body = {
       status: err.message
     }
+    ctx.state.error = {
+      name: err.name,
+      message: err.message,
+      status_code: ctx.status,
+      stack: ctx.status >= 500 ? err.stack : undefined
+    };
     if (ctx.status >= 500) {
       ctx.app.emit('error', err, ctx);
     }
@@ -66,6 +79,7 @@ app.on('error', (err, ctx) => {
     request_id: ctx?.state?.requestId,
     error_name: err.name,
     error_message: err.message,
+    error_stack: err.stack,
     status_code: err.status || 500
   });
 });

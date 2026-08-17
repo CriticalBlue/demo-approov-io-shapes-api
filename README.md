@@ -51,14 +51,14 @@ Set `ENFORCE_APPROOV=false` only for a controlled warning-mode test. In this mod
 
 The `v5` endpoint reads the optional `ipk` claim from a valid Approov token. If the claim exists, the server requires a valid HTTP message signature.
 
-## Usage logs for Dozzer
+## Detailed request logs for Dozzle
 
-The server writes one JSON record for each request. Dozzer can ingest these records from standard output.
+The server writes one structured JSON record for each request. Dozzle reads these records from the container's standard output. Successful requests use level `info`, rejected requests use `warn`, and server failures use `error`.
 
 Example record:
 
 ```json
-{"timestamp":"2026-08-17T12:00:00.000Z","level":"info","service":"shapes-api","event":"api_request","request_id":"6e91b433-a320-444d-99fb-31a61410ed39","method":"GET","endpoint":"shapes","api_version":"v3","supported_endpoint":true,"status_code":200,"outcome":"success","duration_ms":4.27,"quickstart":"ios-urlsession","approov_account":"example.approov.io","app_id":"com.example.app","device_id_hash":"991f74ac2f01bd6c39e153bfd8068770","client_ip_hash":"ee16f6db33fe6d716250396a28072965","country":"GB","auth":{"api_key":"valid","approov_token":"valid"}}
+{"timestamp":"2026-08-17T12:00:00.000Z","level":"info","service":"shapes-api","event":"api_request","request_id":"6e91b433-a320-444d-99fb-31a61410ed39","method":"GET","endpoint":"shapes","api_version":"v3","status_code":200,"outcome":"success","duration_ms":4.27,"client_ip":"203.0.113.42","auth":{"approov_token":"valid","api_key":"valid"},"auth_checks":[{"control":"approov_token","result":"valid","reason":"valid approov token","enforced":true},{"control":"api_key","result":"valid","reason":"valid api key","enforced":true}],"request":{"method":"GET","original_url":"/v3/shapes","client_ip":"203.0.113.42","headers":{"approov-token":"[captured in approov.token]","api-key":"[redacted]"}},"approov":{"token":"full.jwt.value","claims":{"iss":"example.approov.io","sub":"approov|device|com.example.app"}},"response":{"status_code":200,"body":{"shape":"circle","status":"circle (approoved and api key valid)"}}}
 ```
 
 Use these fields for basic metrics:
@@ -70,12 +70,16 @@ Use these fields for basic metrics:
 - `device_id_hash` gives a pseudonymous installation count.
 - `client_ip_hash` gives a pseudonymous source count.
 - `country` gives a location when a trusted proxy supplies it.
-- `status_code`, `outcome`, and `auth` show success and rejection rates.
+- `status_code`, `outcome`, `auth`, and `auth_checks` show each access-control decision.
+- `rejection` records the stage, exact reason, and captured error for rejected requests.
+- `request` records the URL, query, protocol, host, IP chain, headers, and body.
+- `approov` records the complete Approov token and decoded claims when configured.
+- `response` records the final status, headers, and response body.
 - `duration_ms` provides API latency.
 
 The `quickstart` field is client-supplied metadata. Do not use it as an authenticated identity.
 
-The server never logs API keys, Approov tokens, authorization headers, public keys, or signatures. Raw client IP addresses and user agents are disabled by default.
+Detailed logging is enabled by default for this demo API. It includes raw client IP addresses, user agents, the complete Approov token, decoded token claims, request headers, and response bodies. API keys, `Authorization`, cookies, proxy authorization, and response cookies remain redacted. Restrict Dozzle access and configure an appropriate log-retention period.
 
 Set `TRACKING_HASH_SALT` to a random secret with at least 16 characters. Without this value, the server omits both pseudonymous hash fields.
 
@@ -97,7 +101,7 @@ Set `TRUST_PROXY=true` only behind a trusted reverse proxy. This repository sets
 
 Set `CLIENT_COUNTRY_HEADER` only when the trusted proxy controls that header. For Cloudflare, the value is usually `CF-IPCountry`.
 
-Example Dozzer filter:
+Example Dozzle filter:
 
 ```text
 service:"shapes-api" AND event:"api_request" AND supported_endpoint:true
@@ -120,6 +124,8 @@ The exporter uses the European collection host by default. Set `GA_HOST=www.goog
 
 The exporter sends the `quickstart_api_request` custom event. It sends advertising consent as denied and never delays an API response.
 
+Each delivery produces a correlated structured log record. Filter on `event:"analytics_delivery"`, `event:"analytics_delivery_skipped"`, or `event:"analytics_delivery_failed"`. Failure records include the error name, message, stack, HTTP status, and the provider response body when one exists, but never the GA API secret.
+
 Google describes the Measurement Protocol as an addition to normal web or Firebase collection. A server-only integration provides partial reporting.
 
 HubSpot is not part of the runtime integration. Its current custom-event API requires a predefined event and a CRM record identifier.
@@ -140,8 +146,12 @@ HubSpot is not part of the runtime integration. Its current custom-event API req
 | `ENABLE_DEBUG_LOGGING` | `false` | Write extra debug logs. |
 | `TRUST_PROXY` | `false` | Trust proxy forwarding headers. |
 | `TRACKING_HASH_SALT` | Empty | Secret for pseudonymous identifiers. |
-| `LOG_CLIENT_IP` | `false` | Include raw client IP addresses. |
-| `LOG_USER_AGENT` | `false` | Include raw user-agent values. |
+| `LOG_CLIENT_IP` | `true` | Include client, proxy-chain, and socket IP addresses. |
+| `LOG_USER_AGENT` | `true` | Include raw user-agent values. |
+| `LOG_APPROOV_TOKEN` | `true` | Include the complete Approov token and decoded claims. |
+| `LOG_REQUEST_HEADERS` | `true` | Include request headers, with API keys and unrelated credentials redacted. |
+| `LOG_REQUEST_BODY` | `true` | Include parsed or raw request bodies when available. |
+| `LOG_RESPONSE_BODY` | `true` | Include the final response body. |
 | `CLIENT_COUNTRY_HEADER` | Empty | Trusted proxy country header. |
 | `ENABLE_GOOGLE_ANALYTICS` | `false` | Send GA4 events. |
 | `GA_MEASUREMENT_ID` | Empty | GA4 stream measurement ID. |

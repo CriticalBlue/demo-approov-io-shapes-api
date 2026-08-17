@@ -24,6 +24,46 @@ const safeText = (value, maximumLength = 100) => {
   return normalized ? normalized.slice(0, maximumLength) : undefined;
 };
 
+const redactGoogleAnalyticsSecret = (value) => {
+  if (typeof value !== 'string' || !process.env.GA_API_SECRET) {
+    return value;
+  }
+
+  return value
+    .replaceAll(process.env.GA_API_SECRET, '[redacted]')
+    .replaceAll(encodeURIComponent(process.env.GA_API_SECRET), '[redacted]');
+};
+
+const logValue = (value) => {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (Buffer.isBuffer(value)) {
+    return value.toString('utf8');
+  }
+  if (typeof value !== 'object' || value === null) {
+    return value;
+  }
+
+  const seen = new WeakSet();
+  try {
+    return JSON.parse(JSON.stringify(value, (_key, entry) => {
+      if (typeof entry === 'bigint') {
+        return entry.toString();
+      }
+      if (typeof entry === 'object' && entry !== null) {
+        if (seen.has(entry)) {
+          return '[circular]';
+        }
+        seen.add(entry);
+      }
+      return entry;
+    }));
+  } catch (error) {
+    return `[unserializable: ${safeText(error.message, 160) || 'unknown error'}]`;
+  }
+};
+
 const quickstartName = (value) => {
   const name = safeText(value, 80);
   return /^[A-Za-z0-9][A-Za-z0-9._/-]{0,79}$/.test(name || '') ? name : undefined;
@@ -62,11 +102,60 @@ const requestId = (ctx) => {
   return /^[A-Za-z0-9._:-]{1,100}$/.test(supplied) ? supplied : crypto.randomUUID();
 };
 
+const requestHeaders = (ctx) => {
+  if (!readBooleanEnv('LOG_REQUEST_HEADERS', true)) {
+    return undefined;
+  }
+
+  const headers = { ...ctx.headers };
+  for (const name of ['api-key', 'x-api-key', 'authorization', 'cookie', 'proxy-authorization']) {
+    if (headers[name]) {
+      headers[name] = '[redacted]';
+    }
+  }
+  if (headers['approov-token']) {
+    headers['approov-token'] = readBooleanEnv('LOG_APPROOV_TOKEN', true) ?
+      '[captured in approov.token]' : '[redacted]';
+  }
+  return headers;
+};
+
+const responseHeaders = (ctx) => {
+  const headers = { ...ctx.response?.headers };
+  if (headers['set-cookie']) {
+    headers['set-cookie'] = '[redacted]';
+  }
+  return headers;
+};
+
+const rejectionDetails = (ctx) => {
+  if (ctx.status < 400) {
+    return undefined;
+  }
+
+  return compact({
+    stage: safeText(ctx.state.rejectionStage, 80) ||
+      (ctx.status === 404 ? 'routing' : ctx.status === 405 ? 'method' : 'request'),
+    reason: safeText(ctx.state.auth_failure || ctx.state.error?.message || ctx.body?.status, 300) ||
+      (ctx.status === 404 ? 'route not found' : ctx.status === 405 ? 'method not allowed' : safeText(ctx.message, 300)),
+    error: logValue(ctx.state.error)
+  });
+};
+
 const buildUsageEvent = (ctx, durationMs) => {
   const route = SUPPORTED_ENDPOINTS.get(`${ctx.method} ${ctx.path}`);
   const claims = ctx.state.approovClaims || {};
   const country = clientCountry(ctx);
   const clientIp = ctx.ip;
+
+  const logClientIp = readBooleanEnv('LOG_CLIENT_IP', true);
+  const logUserAgent = readBooleanEnv('LOG_USER_AGENT', true);
+  const logApproovToken = readBooleanEnv('LOG_APPROOV_TOKEN', true);
+  const approovToken = ctx.get('Approov-Token');
+  const approovDetails = logApproovToken && (approovToken || Object.keys(claims).length) ? compact({
+    token: approovToken,
+    claims: logValue(claims)
+  }) : undefined;
 
   return compact({
     event: 'api_request',
@@ -84,12 +173,35 @@ const buildUsageEvent = (ctx, durationMs) => {
     audience: safeText(claims.aud, 100),
     device_id_hash: trackingHash(claims.did),
     client_ip_hash: trackingHash(clientIp),
-    client_ip: readBooleanEnv('LOG_CLIENT_IP', false) ? clientIp : undefined,
+    client_ip: logClientIp ? clientIp : undefined,
     country,
     token_ip_matches_request: typeof claims.ip === 'string' && clientIp ? claims.ip === clientIp : undefined,
-    user_agent: readBooleanEnv('LOG_USER_AGENT', false) ? safeText(ctx.get('User-Agent'), 200) : undefined,
+    user_agent: logUserAgent ? safeText(ctx.get('User-Agent'), 1000) : undefined,
     auth: Object.keys(ctx.state.auth || {}).length ? ctx.state.auth : undefined,
-    auth_failure: safeText(ctx.state.auth_failure, 100)
+    auth_checks: ctx.state.authChecks?.length ? logValue(ctx.state.authChecks) : undefined,
+    auth_failure: safeText(ctx.state.auth_failure, 300),
+    rejection: rejectionDetails(ctx),
+    request: compact({
+      method: ctx.method,
+      original_url: safeText(ctx.originalUrl || ctx.url, 4096),
+      path: ctx.path,
+      query: logValue(ctx.query),
+      protocol: safeText(ctx.protocol, 20),
+      host: safeText(ctx.host, 300),
+      client_ip: logClientIp ? clientIp : undefined,
+      proxy_ips: logClientIp && ctx.ips?.length ? ctx.ips : undefined,
+      socket_ip: logClientIp ? ctx.req?.socket?.remoteAddress : undefined,
+      headers: requestHeaders(ctx),
+      body: readBooleanEnv('LOG_REQUEST_BODY', true) ?
+        logValue(ctx.request?.body ?? ctx.request?.rawBody) : undefined
+    }),
+    approov: approovDetails,
+    response: compact({
+      status_code: ctx.status,
+      message: safeText(ctx.message, 300),
+      headers: responseHeaders(ctx),
+      body: readBooleanEnv('LOG_RESPONSE_BODY', true) ? logValue(ctx.body) : undefined
+    })
   });
 };
 
@@ -125,6 +237,36 @@ const gaClientId = (usageEvent) => {
   const first = (Number.parseInt(identity.slice(0, 8), 16) || 1) >>> 0;
   const second = (Number.parseInt(identity.slice(8, 16), 16) || 1) >>> 0;
   return `${first}.${second}`;
+};
+
+const googleAnalyticsConfiguration = () => {
+  const enabled = readBooleanEnv('ENABLE_GOOGLE_ANALYTICS', false);
+  const measurementId = process.env.GA_MEASUREMENT_ID;
+  const host = process.env.GA_HOST || 'region1.google-analytics.com';
+  const issues = [];
+
+  if (enabled && !/^G-[A-Z0-9]+$/.test(measurementId || '')) {
+    issues.push('invalid or missing GA_MEASUREMENT_ID');
+  }
+  if (enabled && !process.env.GA_API_SECRET) {
+    issues.push('missing GA_API_SECRET');
+  }
+  if (enabled && !GA_HOSTS.has(host)) {
+    issues.push('GA_HOST is not allow-listed');
+  }
+  if (enabled && (process.env.TRACKING_HASH_SALT || '').length < 16) {
+    issues.push('missing or too-short TRACKING_HASH_SALT');
+  }
+
+  return {
+    enabled,
+    valid: issues.length === 0,
+    measurement_id: measurementId,
+    host,
+    api_secret_configured: Boolean(process.env.GA_API_SECRET),
+    tracking_hash_salt_configured: (process.env.TRACKING_HASH_SALT || '').length >= 16,
+    issues
+  };
 };
 
 const sendGoogleAnalyticsEvent = async (usageEvent, fetchImplementation = globalThis.fetch) => {
@@ -178,9 +320,12 @@ const sendGoogleAnalyticsEvent = async (usageEvent, fetchImplementation = global
       }
     );
     if (!response.ok) {
-      throw new Error(`Google Analytics returned HTTP ${response.status}`);
+      const responseBody = safeText(redactGoogleAnalyticsSecret(await response.text().catch(() => '')), 2000);
+      const error = new Error(`Google Analytics returned HTTP ${response.status}`);
+      error.analytics = compact({ status_code: response.status, response_body: responseBody });
+      throw error;
     }
-    return { sent: true };
+    return { sent: true, status_code: response.status };
   } finally {
     clearTimeout(timeout);
   }
@@ -195,15 +340,38 @@ const usageTracking = () => async (ctx, next) => {
     await next();
   } finally {
     const usageEvent = buildUsageEvent(ctx, performance.now() - startedAt);
-    logEvent('info', usageEvent);
+    const requestLogLevel = ctx.status >= 500 ? 'error' : ctx.status >= 400 ? 'warn' : 'info';
+    logEvent(requestLogLevel, usageEvent);
 
     if (usageEvent.supported_endpoint) {
-      void sendGoogleAnalyticsEvent(usageEvent).catch((error) => {
-        logEvent('warn', {
+      void sendGoogleAnalyticsEvent(usageEvent).then((result) => {
+        if (result.sent) {
+          logEvent('info', {
+            event: 'analytics_delivery',
+            request_id: usageEvent.request_id,
+            provider: 'google_analytics',
+            outcome: 'sent',
+            status_code: result.status_code
+          });
+        } else if (result.reason !== 'disabled') {
+          logEvent('warn', {
+            event: 'analytics_delivery_skipped',
+            request_id: usageEvent.request_id,
+            provider: 'google_analytics',
+            outcome: 'skipped',
+            reason: result.reason
+          });
+        }
+      }).catch((error) => {
+        logEvent('error', {
           event: 'analytics_delivery_failed',
           request_id: usageEvent.request_id,
           provider: 'google_analytics',
-          reason: safeText(error.message, 160)
+          outcome: 'failed',
+          error_name: safeText(error.name, 100),
+          error_message: safeText(redactGoogleAnalyticsSecret(error.message), 500),
+          error_stack: safeText(redactGoogleAnalyticsSecret(error.stack), 8000),
+          provider_response: logValue(error.analytics)
         });
       });
     }
@@ -212,6 +380,7 @@ const usageTracking = () => async (ctx, next) => {
 
 export {
   buildUsageEvent,
+  googleAnalyticsConfiguration,
   logEvent,
   sendGoogleAnalyticsEvent,
   trackingHash,

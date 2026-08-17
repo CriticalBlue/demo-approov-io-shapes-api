@@ -51,7 +51,12 @@ const verifyHTTPSig = async (ctx, publicKey) => {
         publicKeyPEM = publicKeyPEMFromClaim(publicKey);
     } catch (error) {
         debug(`Invalid message signature public key: ${error}`);
-        return { valid: false, status: 'invalid message signature public key' };
+        return {
+            valid: false,
+            status: 'invalid message signature public key',
+            error_name: error.name,
+            error_message: error.message
+        };
     }
     // Check the digest header if it exists (pass the node request object (ctx.req), *not* the Koa request object (ctx.request))
     if (ctx.req.headers['content-digest'] || ctx.req.headers['digest']) {
@@ -76,7 +81,12 @@ const verifyHTTPSig = async (ctx, publicKey) => {
         }
     } catch (error) {
       debug(`Malformed message signature: ${error}`);
-        return { valid: false, status: 'malformed message signature' };
+        return {
+            valid: false,
+            status: 'malformed message signature',
+            error_name: error.name,
+            error_message: error.message
+        };
     }
 
     // Verify the signature
@@ -87,7 +97,12 @@ const verifyHTTPSig = async (ctx, publicKey) => {
         }
     } catch (error) {
         debug(`Message signature error: ${error}`);
-        return { valid: false, status: 'message signature error' };
+        return {
+            valid: false,
+            status: 'message signature error',
+            error_name: error.name,
+            error_message: error.message
+        };
     }
     return { valid: true, status: 'valid HTTP message signature' };
 }

@@ -2,16 +2,18 @@
 
 import { debug } from './utils.js';
 import Router from '@koa/router';
-import { requireApiKey, requireApproovToken } from './access-control.js';
+import { recordAuthCheck, requireApiKey, requireApproovToken } from './access-control.js';
 import { verifyHTTPSig } from './http-sig.js';
 import { randomShape } from './shapes.js';
 
 // API key, approov token, and HTTP message signature checks
 
-const abortOnInvalidHTTPSig = (ctx, { valid, status }) => {
-  ctx.state.auth = { ...ctx.state.auth, message_signature: valid ? 'valid' : 'invalid' };
+const abortOnInvalidHTTPSig = (ctx, result) => {
+  const { valid, status } = result;
+  recordAuthCheck(ctx, 'message_signature', result);
   if (!valid) {
     ctx.state.auth_failure = status;
+    ctx.state.rejectionStage = 'message_signature';
     debug(`HTTP signature validation failed: ${status} - error`);
     ctx.throw(400, status);
   }
@@ -38,11 +40,21 @@ router.use('/shapes', async (ctx, next) => {
   // server and accept the message.
   const pubKey = tokenResult.claims?.ipk;
   ctx.state.messageSignatureVerified = false;
-  ctx.state.auth = { ...ctx.state.auth, message_signature: pubKey ? 'required' : 'not_required' };
   if (pubKey) {
     const msgSignResult = await verifyHTTPSig(ctx, pubKey);
     abortOnInvalidHTTPSig(ctx, msgSignResult);
     ctx.state.messageSignatureVerified = true;
+  } else {
+    ctx.state.auth = { ...ctx.state.auth, message_signature: 'not_required' };
+    ctx.state.authChecks = [
+      ...(ctx.state.authChecks || []),
+      {
+        control: 'message_signature',
+        result: 'not_required',
+        reason: 'Approov token has no ipk claim',
+        enforced: false
+      }
+    ];
   }
 
   await next();
