@@ -44,37 +44,41 @@ const deviceQueue = {
 //     in the register.
 const MAX_REGISTER_SIZE = 100;
 const register = {
-  devices: {},
+  devices: new Map(),
   add: (deviceID, value) => {
-    if (register.devices.hasOwnProperty(deviceID)) {
+    if (typeof deviceID !== 'string' || deviceID.length === 0) {
+      debug('device add failed: invalid device ID');
+      return false;
+    }
+    if (register.devices.has(deviceID)) {
       debug(`device add failed: ${deviceID} already registered`);
       return false;
     }
     // evict an old device if we need to make room for the new
-    if (Object.keys(register.devices).length > MAX_REGISTER_SIZE) {
+    if (register.devices.size >= MAX_REGISTER_SIZE) {
       let evictedDeviceID = deviceQueue.pop();
       if (evictedDeviceID) {
-        delete register.devices[evictedDeviceID];
+        register.devices.delete(evictedDeviceID);
       }
     }
     // add the new device
     deviceQueue.push(deviceID);
-    register.devices[deviceID] = value;
+    register.devices.set(deviceID, value);
     return true;
   },
   get: (deviceID) => {
-    if (register.devices.hasOwnProperty(deviceID)) {
-      return register.devices[deviceID];
+    if (register.devices.has(deviceID)) {
+      return register.devices.get(deviceID);
     }
     return null;
   },
   set: (deviceID, value) => {
-    if (!register.devices.hasOwnProperty(deviceID)) {
+    if (!register.devices.has(deviceID)) {
       debug(`device set failed: ${deviceID} not registered`);
       return false;
     }
     // update the device value
-    register.devices[deviceID] = value;
+    register.devices.set(deviceID, value);
     return true;
   }
 };

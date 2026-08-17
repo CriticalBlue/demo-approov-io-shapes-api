@@ -45,13 +45,12 @@ const verifyToken = (ctx, payClaimData) => {
     const payClaimValue = claims['pay'];
     if (!payClaimValue) {
       debug('missing pay claim in Approov; binding comparison ignored');
-      return { valid: false, status: 'approov token has no pay claim' };
-    }
-
-    const payClaimDataHash = crypto.createHash('sha256').update(payClaimData).digest('base64');
-    if (payClaimValue !== payClaimDataHash) {
-      debug(`approov-pay-claim mismatch: claim ${payClaimValue} != data hash ${payClaimDataHash}`);
-      return { valid: false, status: 'approov token pay claim mismatch' };
+    } else {
+      const payClaimDataHash = crypto.createHash('sha256').update(payClaimData).digest('base64');
+      if (payClaimValue !== payClaimDataHash) {
+        debug(`approov-pay-claim mismatch: claim ${payClaimValue} != data hash ${payClaimDataHash}`);
+        return { valid: false, status: 'approov token pay claim mismatch' };
+      }
     }
   }
   return { valid: true, status: 'valid approov token', token: approovToken, claims: claims };
@@ -73,12 +72,22 @@ const verifyApproovAuthTokenBinding = (ctx) => {
   return verifyToken(ctx, authData);
 }
 
-const processPayloadResults = (keys, data, lastDeviceResult) => {
+const payloadCheckers = [
+  (data, responseData) => {
+    if (typeof data.id !== 'string' || data.id.length === 0) {
+      return false;
+    }
+    responseData.id = data.id;
+    return true;
+  }
+];
+
+const processPayloadResults = (keys, data) => {
   const deviceResult = {pass: true};
-  const responseData = {id:data.id};
-  for (const [idx, checker] of [].entries()) {
+  const responseData = {};
+  for (const [idx, checker] of payloadCheckers.entries()) {
     if (!checker(data, responseData)) {
-      debug('checker@${idx} caused failure');
+      debug(`checker@${idx} caused failure`);
       deviceResult.pass = false;
     }
   }
@@ -114,22 +123,26 @@ const verifyCustomPayloadWithToken = (ctx, registerNewDevice) => {
   if (!tokenResult.valid) {
     return tokenResult;
   }
+  const deviceId = tokenResult.claims.did;
+  if (typeof deviceId !== 'string' || deviceId.length === 0) {
+    return { valid: false, status: 'device fail; missing device id' };
+  }
   // check for register new device flag and set it up with at least the current token
   if (registerNewDevice) {
-    registerDeviceWithValue(tokenResult.claims.did, {pass: true, token: tokenResult.token})
+    registerDeviceWithValue(deviceId, {pass: true, token: tokenResult.token})
   }
   // Retrieve the registered device properties
-  const deviceResult = getDeviceValue(tokenResult.claims.did);
+  const deviceResult = getDeviceValue(deviceId);
   if (!deviceResult) {
     return { valid: false, status: 'device fail; not registered' };
   }
 
   // now check the rest of the payload properties if they are present
   if (payloadResult) {
-    const [newDeviceResult, payloadResponse] = processPayloadResults(payloadResult.keys, payloadResult.data, deviceResult)
+    const [newDeviceResult, payloadResponse] = processPayloadResults(payloadResult.keys, payloadResult.data)
     // add the raw token to the result for future matching
     newDeviceResult.token = tokenResult.token;
-    resetDeviceValue(tokenResult.claims.did, newDeviceResult);
+    resetDeviceValue(deviceId, newDeviceResult);
     // add the response header to the generated value whether or not the
     // payload result check was successful
     ctx.set(CUSTOM_PAYLOAD_RESPONSE_HEADER, payloadResponse)

@@ -1,14 +1,13 @@
 // shapes api server - v5 protected routes
 
-import { debug } from './utils.js';
-import Router from 'koa-router';
+import { debug, readBooleanEnv } from './utils.js';
+import Router from '@koa/router';
 // TODO remove API key check?
 import { verifyApiKey } from './api-key.js';
-// TODO support token binding and custom payload verification?
-import { verifyToken, verifyApproovAuthTokenBinding, verifyCustomPayloadWithToken } from './auth.js';
+import { verifyToken } from './auth.js';
 import { verifyHTTPSig } from './http-sig.js';
 
-const ENFORCE_APPROOV = (process.env.ENFORCE_APPROOV || 'true') == 'true';
+const ENFORCE_APPROOV = readBooleanEnv('ENFORCE_APPROOV', true);
 
 // API key, approov token, and HTTP message signature checks
 
@@ -63,10 +62,12 @@ router.use('/shapes', async (ctx, next) => {
   // Check whether the Approov token contains an installation public key (ipk) claim. If it does, we use this to verify
   // the HTTP signature. If it does not, we know that the message has no signature that we should check in the demo
   // server and accept the message.
-  const pubKey = tokenResult.claims['ipk'];
+  const pubKey = tokenResult.claims?.ipk;
+  ctx.state.messageSignatureVerified = false;
   if (pubKey) {
     const msgSignResult = await verifyHTTPSig(ctx, pubKey);
     abortOnInvalidHTTPSig(ctx, msgSignResult);
+    ctx.state.messageSignatureVerified = true;
   }
 
   await next();
@@ -91,7 +92,9 @@ router.get('/shapes', async ctx => {
   debug(`shape: ${shape}`);
   ctx.body = {
     shape,
-    status: `${shape} (approoved with valid message signature)`
+    status: ctx.state.messageSignatureVerified ?
+      `${shape} (approoved with valid message signature)` :
+      `${shape} (approoved without message signature)`
   };
 });
 

@@ -4,12 +4,17 @@ import request from 'supertest';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 
-import { httpServer as server } from '../server/index.js';
+const approovSecret = crypto.randomBytes(32);
+process.env.APPROOV_SECRET = approovSecret.toString('base64');
+process.env.HTTP_PORT = '0';
+process.env.ENFORCE_HTTPS = 'false';
+process.env.ENFORCE_APPROOV = 'true';
+process.env.ENABLE_LOGGING = 'false';
+
+const { httpServer: server } = await import('../server/index.js');
 
 // close the service after all tests completed
-afterAll(() => {
-  server.close();
-});
+afterAll(() => new Promise(resolve => server.close(resolve)));
 
 const V = '/v2';
 
@@ -29,9 +34,8 @@ describe(`get ${V}/hello`, () => {
   });
 });
 
-const approovSecret = Buffer.from(process.env.APPROOV_SECRET || '', 'base64');
 const approovTokenHeader = 'Approov-Token';
-const authenticationHeader = 'Authentication';
+const authenticationHeader = 'Authorization';
 const bindingData = 'BINDING_DATA';
 const payClaim = crypto.createHash('sha256').update(bindingData).digest('base64');
 
@@ -58,7 +62,7 @@ describe(`get ${V}/shapes`, () => {
   });
 
   test('should respond with 400 (invalid approov-token)', async () => {
-    const approovToken = jwt.sign({}, approovSecret + '?', {expiresIn: '1h'});
+    const approovToken = jwt.sign({}, Buffer.concat([approovSecret, Buffer.from('?')]), {expiresIn: '1h'});
 
     const response = await request(server)
     .get(`${V}/shapes`)
@@ -146,16 +150,18 @@ describe(`get ${V}/forms`, () => {
 
   test('should respond with 400 (missing approov-token)', async () => {
     const response = await request(server)
-    .get(`${V}/shapes`);
+    .get(`${V}/forms`)
+    .set(authenticationHeader, `Bearer ${bindingData}`);
     
     expect(response.status).toEqual(400);
   });
 
   test('should respond with 400 (invalid approov-token)', async () => {
-    const approovToken = jwt.sign({}, approovSecret + '?', {expiresIn: '1h'});
+    const approovToken = jwt.sign({}, Buffer.concat([approovSecret, Buffer.from('?')]), {expiresIn: '1h'});
 
     const response = await request(server)
-    .get(`${V}/shapes`)
+    .get(`${V}/forms`)
+    .set(authenticationHeader, `Bearer ${bindingData}`)
     .set(approovTokenHeader, approovToken);
     
     expect(response.status).toEqual(400);
@@ -165,7 +171,8 @@ describe(`get ${V}/forms`, () => {
     const approovToken = jwt.sign({}, approovSecret, {expiresIn: -3600});
 
     const response = await request(server)
-    .get(`${V}/shapes`)
+    .get(`${V}/forms`)
+    .set(authenticationHeader, `Bearer ${bindingData}`)
     .set(approovTokenHeader, approovToken);
     
     expect(response.status).toEqual(400);

@@ -6,8 +6,6 @@ services:
     image: ${DOCKER_IMAGE:-approov/demo-approov-io-shapes-api:dev}
     build:
       context: .
-      args:
-        BUILD_RELEASE_FROM: ${BUILD_RELEASE_FROM:-main} # pass through to container from .env file
     env_file:
       # ORDER OF THE ENV FILES MATTERS - definitions in later files override earlier ones.
       # No environment variables are inherited from the host environment.
@@ -25,8 +23,6 @@ services:
     image: ${DOCKER_IMAGE:-approov/demo-approov-io-shapes-api}
     build:
       context: .
-      args:
-        BUILD_RELEASE_FROM: ${BUILD_RELEASE_FROM:-main} # pass through to container from .env file
     restart: always
     env_file:
       # ORDER OF THE ENV FILES MATTERS - definitions in later files override earlier ones.

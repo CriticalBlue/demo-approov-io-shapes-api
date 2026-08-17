@@ -4,9 +4,9 @@ import dotenv from 'dotenv';
 import { debug } from './utils.js';
 import Koa from 'koa';
 import cors from '@koa/cors';
-import Router from 'koa-router';
+import Router from '@koa/router';
 import logger from 'koa-logger';
-import sslify, { xForwardedProtoResolver as xfpResolver } from 'koa-sslify';
+import sslifyPackage, { xForwardedProtoResolver as xfpResolver } from 'koa-sslify';
 import http from 'http';
 import https from 'https';
 import v0Router from './v0-routes.js';
@@ -15,6 +15,10 @@ import v2Router from './v2-routes.js';
 import v3Router from './v3-routes.js';
 import v4Router from './v4-routes.js';
 import v5Router from './v5-routes.js';
+
+// koa-sslify is CommonJS, so Node exposes its default export differently
+// across supported package versions.
+const sslify = sslifyPackage.default || sslifyPackage;
 
 // ORDER OF THE ENV FILES MATTERS - existing environment takes precedence, then
 // earlier files over later ones. Note that when running this with docker compose,
@@ -30,6 +34,15 @@ const HTTPS_MODE=(process.env.HTTPS_MODE || 'direct').toLowerCase();
 const HTTPS_KEY=Buffer.from(process.env.HTTPS_KEY || '', 'base64');
 const HTTPS_CRT=Buffer.from(process.env.HTTPS_CRT || '', 'base64');
 const LOG = (process.env.ENABLE_LOGGING || 'true').toLowerCase() === 'true';
+
+if (!['direct', 'x-forwarded-proto'].includes(HTTPS_MODE)) {
+  throw new Error(`HTTPS_MODE '${HTTPS_MODE}' not recognized`);
+}
+
+if (HTTPS_MODE === 'direct' && ENFORCE_HTTPS && (HTTPS_KEY.length === 0 || HTTPS_CRT.length === 0)) {
+  throw new Error('ENFORCE_HTTPS requires HTTPS_KEY and HTTPS_CRT in direct mode');
+}
+
 const app = new Koa();
 app.use(cors());
 
@@ -50,6 +63,16 @@ app.use(async (ctx, next) => {
     ctx.app.emit('error', err, ctx);
   }
 });
+
+// HTTPS enforcement must run before route handlers, which terminate the
+// middleware chain once they have produced a response.
+if (ENFORCE_HTTPS) {
+  app.use(sslify(HTTPS_MODE === 'direct' ? {
+    port: HTTPS_PORT
+  } : {
+    resolver: xfpResolver
+  }));
+}
 
 // handle default route
 
@@ -123,14 +146,8 @@ if (HTTPS_MODE == 'direct') {
 
   console.log("Starting server in direct mode...")
 
-  if (ENFORCE_HTTPS && (HTTPS_KEY.length === 0 || HTTPS_CRT.length === 0)) {
-    console.error("ERROR: Enforce HTTPS is enable but is missing the certificate key pair.")
-  } else if (ENFORCE_HTTPS) {
+  if (ENFORCE_HTTPS) {
     console.log("Starting server on HTTPS port %s", HTTPS_PORT);
-    app.use(sslify({
-      port: HTTPS_PORT
-    }));
-
     httpsServer = https.createServer({key: HTTPS_KEY, cert: HTTPS_CRT}, app.callback())
     .listen({ port: HTTPS_PORT}, () => {
       console.log(`Listening on HTTPS port ${HTTPS_PORT}...`);
@@ -150,13 +167,7 @@ if (HTTPS_MODE == 'direct') {
     console.error(`error: ${err}`);
   });
 
-} else if (HTTPS_MODE == 'x-forwarded-proto') {
-  if (ENFORCE_HTTPS) {
-    app.use(sslify({
-      resolver: xfpResolver
-    }));
-  }
-
+} else {
   httpServer = http.createServer(app.callback())
   .listen({ port: HTTP_PORT}, () => {
     console.log(`Listening on http port ${HTTP_PORT}...`);
@@ -164,8 +175,6 @@ if (HTTPS_MODE == 'direct') {
   .on('error', err => {
     console.error(`error: ${err}`);
   });
-} else {
-  console.error(`ERROR: HTTPS_MODE \'${HTTPS_MODE}\' not recognized`);
 }
 
 // export service close function

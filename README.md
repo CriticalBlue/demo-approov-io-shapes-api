@@ -165,7 +165,7 @@ curl -X GET 'http://localhost:8002/v3/hello'
 Expected response: `{"text":"Hello, World!","status":"Hello, World! (healthy)"}`
 
 ```shell
-curl -H "API-Key: yXClypapWNHIifHUWmBIyPFAm" -H "Authorization: TEST" -H "Approov-Token: $(approov token -genExample shapes.approov.io -setDataHashInToken TEST)" -X GET 'http://localhost:8002/v3/shapes'
+curl -H "API-Key: yXClypapWNHIifHUWmBIyPFAm" -H "Approov-Token: $(approov token -genExample shapes.approov.io)" -X GET 'http://localhost:8002/v3/shapes'
 ```
 
 Expected response: `{"shape":"Rectangle","status":"Rectangle (approoved and api key valid)"}` (or another valid shape).
@@ -184,18 +184,17 @@ curl -X GET 'http://localhost:8002/v4/hello'
 
 Expected response: `{"text":"Hello, World!","status":"Hello, World! (healthy)"}`
 
-The `shapes` and `forms` endpoints are not testable with `curl` and `approov` because the Approov CLI cannot generate an Approov token with custom claims.
+The `shapes` and `register` endpoints are not testable with `curl` and `approov` because the Approov CLI cannot generate an Approov token with the required custom payload binding.
 
 ### /v5 - API Key, Approov Token and HTTP Message Signature Protected
 
 ```shell
-curl -X GET 'http://localhost:8002/v4/hello'
+curl -X GET 'http://localhost:8002/v5/hello'
 ```
 
 Expected response: `{"text":"Hello, World!","status":"Hello, World! (healthy)"}`
 
-The `shapes` endpoint is not testable with `curl` and `approov` because `curl` has no support for HTTP message signing yet and
-the Approov CLI cannot generate an Approov token with a custom `ipk` claim.
+An ordinary Approov token without an `ipk` claim exercises the unsigned compatibility path. When an Approov token contains an `ipk` installation public-key claim, the `shapes` request must carry a valid HTTP message signature for that key; this signed path is not directly testable with `curl` and the Approov CLI alone.
 
 ## Testing the Approov Shapes Server with the Postman Collection
 
