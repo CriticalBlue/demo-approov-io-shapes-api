@@ -57,11 +57,11 @@ describe('v5 HTTP message signatures', () => {
       .set(headers);
   };
 
-  test('keeps the health endpoint public', async () => {
-    const response = await request(server).get('/v5/hello');
+  test('keeps the single health endpoint public', async () => {
+    const response = await request(server).get('/hello');
 
     expect(response.status).toBe(200);
-    expect(response.body.text).toBe('Hello, World!');
+    expect(response.text).toBe('Hello, World!');
   });
 
   test('requires the API key before other v5 checks', async () => {

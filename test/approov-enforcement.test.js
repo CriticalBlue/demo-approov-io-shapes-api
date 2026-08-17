@@ -10,6 +10,7 @@ describe('Approov enforcement configuration', () => {
     process.env.HTTPS_MODE = 'direct';
     process.env.HTTP_PORT = '0';
     process.env.ENABLE_LOGGING = 'false';
+    process.env.API_KEY = 'enforcement-test-key';
 
     ({ httpServer: server } = await import('../server/index.js'));
   });
@@ -17,7 +18,9 @@ describe('Approov enforcement configuration', () => {
   afterAll(() => new Promise(resolve => server.close(resolve)));
 
   test('treats boolean values case-insensitively and fails closed', async () => {
-    const response = await request(server).get('/v2/shapes');
+    const response = await request(server)
+      .get('/v3/shapes')
+      .set('Api-Key', 'enforcement-test-key');
 
     expect(response.status).toBe(400);
     expect(response.body.status).toBe('missing approov token');

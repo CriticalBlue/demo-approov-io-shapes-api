@@ -1,17 +1,11 @@
 // shapes api server - Approov token verification
 
-import { debug } from './utils.js';
-import crypto from 'crypto';
+import { debug, readBooleanEnv } from './utils.js';
 import jwt from 'jsonwebtoken';
-import { registerDeviceWithValue, getDeviceValue, resetDeviceValue } from './device-register.js';
-import { decodeObjectFromListOfListsJsonUtf8B64url as decodePayload, encodeListOfListsJsonUtf8B64urlFromObject as encodePayload } from './custom-payload.js';
-
-const ALLOW_DEBUG_TOKENS = process.env.ALLOW_DEBUG_TOKENS === 'true';
 
 const approovTokenHeader = 'Approov-Token'.toLowerCase();
-const authenticationHeader = 'Authorization'.toLowerCase();
 
-const verifyToken = (ctx, payClaimData) => {
+const verifyToken = (ctx) => {
   debug('>>> Check Approov token <<<');
 
   const APPROOV_SECRET=Buffer.from(process.env.APPROOV_SECRET || '', 'base64');
@@ -19,16 +13,14 @@ const verifyToken = (ctx, payClaimData) => {
   if (!approovToken) {
     return { valid: false, status: 'missing approov token' };
   }
-  debug(`approov-token: ${approovToken}`);
-  debug(`ALLOW_DEBUG_TOKENS: ${process.env.ALLOW_DEBUG_TOKENS} - ${ALLOW_DEBUG_TOKENS}`)
   let claims = null;
-  if (ALLOW_DEBUG_TOKENS && approovToken.startsWith('{')) {
+  if (readBooleanEnv('ALLOW_DEBUG_TOKENS', false) && approovToken.startsWith('{')) {
     // permit dummy approov token which is just the JSON claims string
     try {
       claims = JSON.parse(approovToken);
-      debug(`succeeded dummy approov token JSON decode: ${approovToken}`)
+      debug('succeeded dummy approov token JSON decode');
     } catch (error) {
-      debug(`failed dummy approov token JSON decode: ${approovToken}, ${error}`);
+      debug(`failed dummy approov token JSON decode: ${error}`);
       return { valid: false, status: 'failed dummy approov token JSON decode' };
     }
   } else {
@@ -38,132 +30,7 @@ const verifyToken = (ctx, payClaimData) => {
       return { valid: false, status: 'invalid approov token' };
     }
   }
-  // If the payClaimData is truthy, then check the pay claim of the token
-  // against the hash of the payClaimData
-  if (payClaimData) {
-    debug('>>> Check Approov token binding <<<');
-    const payClaimValue = claims['pay'];
-    if (!payClaimValue) {
-      debug('missing pay claim in Approov; binding comparison ignored');
-    } else {
-      const payClaimDataHash = crypto.createHash('sha256').update(payClaimData).digest('base64');
-      if (payClaimValue !== payClaimDataHash) {
-        debug(`approov-pay-claim mismatch: claim ${payClaimValue} != data hash ${payClaimDataHash}`);
-        return { valid: false, status: 'approov token pay claim mismatch' };
-      }
-    }
-  }
-  return { valid: true, status: 'valid approov token', token: approovToken, claims: claims };
+  return { valid: true, status: 'valid approov token', claims };
 }
 
-const verifyApproovAuthTokenBinding = (ctx) => {
-  debug('>>> Check Approov Auth Token Binding');
-
-  const authString = ctx.headers[authenticationHeader];
-  if (!authString) {
-    return { valid: false, status: 'missing bearer authentication' };
-  }
-  const split = authString.split(/\s(.+)/);
-  if (split.length < 2 || split[0].toLowerCase() !== 'bearer') {
-    return { valid: false, status: 'invalid bearer authentication' };
-  }
-  const authData = split[1];
-
-  return verifyToken(ctx, authData);
-}
-
-const payloadCheckers = [
-  (data, responseData) => {
-    if (typeof data.id !== 'string' || data.id.length === 0) {
-      return false;
-    }
-    responseData.id = data.id;
-    return true;
-  }
-];
-
-const processPayloadResults = (keys, data) => {
-  const deviceResult = {pass: true};
-  const responseData = {};
-  for (const [idx, checker] of payloadCheckers.entries()) {
-    if (!checker(data, responseData)) {
-      debug(`checker@${idx} caused failure`);
-      deviceResult.pass = false;
-    }
-  }
-  const encodedResponseResult = encodePayload(responseData, keys);
-  if (!encodedResponseResult.valid) {
-    debug('failed response payload encoding: ' + encodedResponseResult.status);
-    deviceResult.pass = false;
-    return [ deviceResult, '' ];  
-  }
-
-  return [ deviceResult, encodedResponseResult.data ];
-}
-
-const CUSTOM_PAYLOAD_HEADER = 'Pay-Content'.toLowerCase();
-const CUSTOM_PAYLOAD_RESPONSE_HEADER = 'Pay-Response'.toLowerCase();
-const verifyCustomPayloadWithToken = (ctx, registerNewDevice) => {
-  var payloadResult, tokenResult;
-  // read the payload if one is present
-  const b64urlData = ctx.headers[CUSTOM_PAYLOAD_HEADER];
-  if (b64urlData) {
-    // decode payload
-    var payloadResult = decodePayload(b64urlData);
-    // { valid: true|false, status: <msg>, data: resultData, keys: keys, jsonData: decodedResult.jsonData };
-    if (!payloadResult.valid) {
-      return { valid: false, status: 'device fail; invalid data in payload header' };
-    }
-    tokenResult = verifyToken(ctx, payloadResult.jsonData)
-    // return { valid: true, status: 'valid approov token', token: approovToken, claims: claims };
-  } else {
-    tokenResult = verifyToken(ctx)
-  }
-  // check for a valid token
-  if (!tokenResult.valid) {
-    return tokenResult;
-  }
-  const deviceId = tokenResult.claims.did;
-  if (typeof deviceId !== 'string' || deviceId.length === 0) {
-    return { valid: false, status: 'device fail; missing device id' };
-  }
-  // check for register new device flag and set it up with at least the current token
-  if (registerNewDevice) {
-    registerDeviceWithValue(deviceId, {pass: true, token: tokenResult.token})
-  }
-  // Retrieve the registered device properties
-  const deviceResult = getDeviceValue(deviceId);
-  if (!deviceResult) {
-    return { valid: false, status: 'device fail; not registered' };
-  }
-
-  // now check the rest of the payload properties if they are present
-  if (payloadResult) {
-    const [newDeviceResult, payloadResponse] = processPayloadResults(payloadResult.keys, payloadResult.data)
-    // add the raw token to the result for future matching
-    newDeviceResult.token = tokenResult.token;
-    resetDeviceValue(deviceId, newDeviceResult);
-    // add the response header to the generated value whether or not the
-    // payload result check was successful
-    ctx.set(CUSTOM_PAYLOAD_RESPONSE_HEADER, payloadResponse)
-    const result = {response: payloadResponse};
-    if (newDeviceResult.pass) {
-      result.valid = true;
-      result.status = 'device pass; updated payload properties';
-    } else {
-      result.valid = false;
-      result.status = 'device fail; updated token';
-    }
-    return result;
-  }
-  // no payload result, just check that the device is registered with a passing result
-  if (!deviceResult.pass) {
-    return { valid: false, status: 'device fail; cached payload check fail' };
-  }
-  if (deviceResult.token !== tokenResult['token']) {
-    return { valid: false, status: 'device fail; unknown token' };
-  }
-  return {valid: true, status: 'device pass; matching token'};
-}
-
-export { verifyToken, verifyApproovAuthTokenBinding, verifyCustomPayloadWithToken };
+export { verifyToken };

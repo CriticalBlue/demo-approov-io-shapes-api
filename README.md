@@ -1,229 +1,175 @@
-# Approov Shapes Server - Node-Koa
+# Approov Shapes API
 
-Approov shapes server using node.js with Koa and running in a docker container behind Traefik on the Approov demo
-server at `shapes.approov.io` and `shapes.demo.approov.io`.
+This server supports the Approov mobile quickstarts. It exposes four `GET` endpoints and no other application endpoints.
 
-## Production Deployment
+| Endpoint | Access control | Purpose |
+|---|---|---|
+| `GET /hello` | Public | Confirm the connection. |
+| `GET /v1/shapes` | API key | Return a random shape. |
+| `GET /v3/shapes` | API key and Approov token | Return a random shape. |
+| `GET /v5/shapes` | API key, Approov token, and conditional message signature | Return a random shape. |
 
-This guide assumes that you are logged in to the EC2 server that you set up by following the instructions for [AWS EC2 Traefik Setup for demo.approov.io](https://github.com/criticalblue/demo-approov-io-traefik). If you followed these instructions, the docker network `traefik`, which is required, will already exist. It can be re-created using this command: `sudo docker network create traefik`.
+All other paths return `404`. The [OpenAPI file](docs/shapes-openapi.yaml) defines the public interface.
 
-Git clone this repo into the home folder `/home/ec2-user` and change to the newly created directory:
+## Run the server
 
-```console
-git clone https://github.com/criticalblue/demo-approov-io-shapes-api.git && cd demo-approov-io-shapes-api
+1. Install the locked dependencies.
+
+   ```sh
+   npm ci
+   ```
+
+2. Copy the example environment file.
+
+   ```sh
+   cp .env.example .env
+   ```
+
+3. Add the required secrets to `.env`.
+
+4. Start the server.
+
+   ```sh
+   npm start
+   ```
+
+5. Validate the connection.
+
+   ```sh
+   curl http://localhost:8002/hello
+   ```
+
+The expected response is `Hello, World!`.
+
+## Access control
+
+Set `API_KEY` for the `v1`, `v3`, and `v5` endpoints. Send this value in the `Api-Key` header.
+
+Set `APPROOV_SECRET` to the base64 Approov token secret. The server validates Approov tokens with the `HS256` algorithm.
+
+Set `ENFORCE_APPROOV=false` only for a controlled warning-mode test. In this mode, the server accepts an invalid or missing Approov token.
+
+The `v5` endpoint reads the optional `ipk` claim from a valid Approov token. If the claim exists, the server requires a valid HTTP message signature.
+
+## Usage logs for Dozzer
+
+The server writes one JSON record for each request. Dozzer can ingest these records from standard output.
+
+Example record:
+
+```json
+{"timestamp":"2026-08-17T12:00:00.000Z","level":"info","service":"shapes-api","event":"api_request","request_id":"6e91b433-a320-444d-99fb-31a61410ed39","method":"GET","endpoint":"shapes","api_version":"v3","supported_endpoint":true,"status_code":200,"outcome":"success","duration_ms":4.27,"quickstart":"ios-urlsession","approov_account":"example.approov.io","app_id":"com.example.app","device_id_hash":"991f74ac2f01bd6c39e153bfd8068770","client_ip_hash":"ee16f6db33fe6d716250396a28072965","country":"GB","auth":{"api_key":"valid","approov_token":"valid"}}
 ```
 
-Copy `.env.example` to `.env` and customize it. The only configuration required is the Approov token signing secret for the demo account.
+Use these fields for basic metrics:
 
-Get the Approov secret using the Approov CLI:
-```bash
-approov secret -get base64
+- `api_version` gives request counts for `v1`, `v3`, and `v5`.
+- `approov_account` identifies the Approov account from the validated `iss` claim.
+- `app_id` identifies the app package from the validated `sub` claim.
+- `quickstart` identifies the client integration from `X-Approov-Quickstart`.
+- `device_id_hash` gives a pseudonymous installation count.
+- `client_ip_hash` gives a pseudonymous source count.
+- `country` gives a location when a trusted proxy supplies it.
+- `status_code`, `outcome`, and `auth` show success and rejection rates.
+- `duration_ms` provides API latency.
+
+The `quickstart` field is client-supplied metadata. Do not use it as an authenticated identity.
+
+The server never logs API keys, Approov tokens, authorization headers, public keys, or signatures. Raw client IP addresses and user agents are disabled by default.
+
+Set `TRACKING_HASH_SALT` to a random secret with at least 16 characters. Without this value, the server omits both pseudonymous hash fields.
+
+Enable the Approov issuer claim to identify an account:
+
+```sh
+approov policy -setIssuer on
 ```
 
-Add the Approov secret to the `.env` file, replacing `your_secret_here`.
-```bash
-APPROOV_SECRET=your_secret_here
+Enable the Approov subject claim to identify an app package:
+
+```sh
+approov policy -setSubject on
 ```
 
-Start the shapes server:
-```bash
-sudo docker-compose up --detach node
+Both commands change an Approov account policy and require an administrator role.
+
+Set `TRUST_PROXY=true` only behind a trusted reverse proxy. This repository sets it for the Traefik production service.
+
+Set `CLIENT_COUNTRY_HEADER` only when the trusted proxy controls that header. For Cloudflare, the value is usually `CF-IPCountry`.
+
+Example Dozzer filter:
+
+```text
+service:"shapes-api" AND event:"api_request" AND supported_endpoint:true
 ```
 
-Inspect the logs (optional):
-```bash
-sudo docker-compose logs --follow --tail 10
+## Optional Google Analytics export
+
+The API can send supported requests to Google Analytics 4 through the Measurement Protocol. This export is disabled by default.
+
+Set these environment variables:
+
+```dotenv
+ENABLE_GOOGLE_ANALYTICS=true
+GA_MEASUREMENT_ID=G-XXXXXXXXXX
+GA_API_SECRET=replace_with_a_secret
+TRACKING_HASH_SALT=replace_with_a_random_secret
 ```
 
-Finally, check the server is running by visiting [https://shapes.demo.approov.io](https://shapes.demo.approov.io) and [https://shapes.approov.io](https://shapes.approov.io). You should see a web page with a short message directing you to the main Approov web site.
-Also check [https://shapes.approov.io/v1/hello](https://shapes.approov.io/v1/hello) (you should see `{"text":"Hello, World!","status":"Hello, World!"}`) and [https://shapes.approov.io/v2/shapes](https://shapes.approov.io/v2/shapes) (you should see `{"status":"missing approov token"}`).
+The exporter uses the European collection host by default. Set `GA_HOST=www.google-analytics.com` to use the global host.
 
-## Local Development
+The exporter sends the `quickstart_api_request` custom event. It sends advertising consent as denied and never delays an API response.
 
-The `docker-compose.yml` file declares the service `dev` that you can use for localhost development, without the need to rebuild the docker image each time changes are made to the code.
+Google describes the Measurement Protocol as an addition to normal web or Firebase collection. A server-only integration provides partial reporting.
 
-### Setup
-Copy `.env.example` to `.env` and customize it. Configure `.env` as shown below and replace `your.domain.com` with the domain used by your server or `localhost` if you are running the shapes API server on your own machine:
+HubSpot is not part of the runtime integration. Its current custom-event API requires a predefined event and a CRM record identifier.
 
-```bash
-# The domain(s) served
-PUBLIC_DOMAIN=your.domain.com
+## Environment variables
 
-# Enable logging of API calls
-ENABLE_LOGGING=true
+| Variable | Default | Description |
+|---|---:|---|
+| `HTTP_PORT` | `8002` | HTTP port. |
+| `HTTPS_PORT` | `8003` | Direct HTTPS port. |
+| `ENFORCE_HTTPS` | `false` | Redirect HTTP requests to HTTPS. |
+| `HTTPS_MODE` | `direct` | Use `direct` or `x-forwarded-proto`. |
+| `API_KEY` | Demo value | API key for protected endpoints. |
+| `APPROOV_SECRET` | Demo value | Base64 secret for Approov token validation. |
+| `ENFORCE_APPROOV` | `true` | Reject invalid Approov tokens. |
+| `ALLOW_DEBUG_TOKENS` | `false` | Accept JSON claim objects for local tests. |
+| `ENABLE_LOGGING` | `true` | Write structured request logs. |
+| `ENABLE_DEBUG_LOGGING` | `false` | Write extra debug logs. |
+| `TRUST_PROXY` | `false` | Trust proxy forwarding headers. |
+| `TRACKING_HASH_SALT` | Empty | Secret for pseudonymous identifiers. |
+| `LOG_CLIENT_IP` | `false` | Include raw client IP addresses. |
+| `LOG_USER_AGENT` | `false` | Include raw user-agent values. |
+| `CLIENT_COUNTRY_HEADER` | Empty | Trusted proxy country header. |
+| `ENABLE_GOOGLE_ANALYTICS` | `false` | Send GA4 events. |
+| `GA_MEASUREMENT_ID` | Empty | GA4 stream measurement ID. |
+| `GA_API_SECRET` | Empty | GA4 Measurement Protocol secret. |
+| `GA_HOST` | `region1.google-analytics.com` | GA4 collection host. |
 
-# Dummy API Key for the v3 endpoint was generated with:
-# $ strings /dev/urandom | grep -o '[[:alpha:]]' | head -n 25 | tr -d '\n'; echo
-API_KEY=yXClypapWNHIifHUWmBIyPFAm
+## Tests
 
-# Feel free to play with different secrets. For development you can create them with:
-# $ openssl rand -base64 64 | tr -d '\n'; echo
-APPROOV_SECRET=h+CX0tOzdAAR9l15bWAqvq7w9olk66daIH+Xk+IAHhVVHszjDzeGobzNnqyRze3lw/WVyWrc2gZfh3XXfBOmww==
+Run the complete test suite:
+
+```sh
+npm test
 ```
 
-Build the docker container:
-```bash
-docker-compose build dev
+The suite validates the four-endpoint boundary, access control, HTTPS redirects, structured tracking, and `v5` message signatures.
+
+## Docker Compose
+
+The `dev` service publishes the API on localhost. The `node` service connects to the external `traefik` network.
+
+Create `.env` before you run Docker Compose. Do not commit secrets from this file.
+
+```sh
+docker compose up --build dev
 ```
 
-**Troubleshooting:**
-1. To fix `open /Users/YOUR-USER-NAME/.docker/buildx/current: permission denied` on Mac, execute `sudo chown -R $(whoami) ~/.docker`
-2. To fix `ERROR [dev internal] load metadata for docker.io/library/node:18-slim`, execute `docker pull node:18-slim`.
+## References
 
-Run the shapes server:
-```bash
-docker-compose up --detach dev
-```
-
-Now, whenever your code is saved, the shapes server is restarted and you can issue new requests against it to test your changes.
-
-The only time you need to rebuild the docker container is when you make changes to the `.env` file. To rebuild the shapes server:
-```bash
-docker-compose down && docker-compose up --detach dev
-```
-
-Assuming the shapes server is running on localhost you can use a web browser to visit [http://localhost:8002](http://localhost:8002) (you should see a web page with a short message directing you to the main Approov web site) and [http://localhost:8002/v1/hello](http://localhost:8002/v1/hello) (you should see `{"text":"Hello, World!","status":"Hello, World!"}`).
-
-Inspect the logs (optional):
-```bash
-docker-compose logs --follow dev
-```
-
-Stop the shapes server:
-```bash
-docker-compose down
-```
-
-## Testing the Approov Shapes Server with Curl on Localhost
-
-### Unprotected Endpoints
-
-```shell
-curl -X GET 'http://localhost:8002/hello'
-```
-
-Expected response: `Hello, World!`
-
-```shell
-curl -X GET 'http://localhost:8002/shapes'
-```
-
-Expected response: `Rectangle` (or another valid shape).
-
-### /v1 - API-Key Protected
-
-This test requires the API-Key in the header to match the API_KEY entry in the `.env` file (except for the hello endpoint which is always unprotected).
-
-```shell
-curl -X GET 'http://localhost:8002/v1/hello'
-```
-
-Expected response: `{"text":"Hello, World!","status":"Hello, World!"}`
-
-```shell
-curl -H "API-Key: yXClypapWNHIifHUWmBIyPFAm" -X GET 'http://localhost:8002/v1/shapes'
-```
-
-Expected response: `{"shape":"Rectangle","status":"Rectangle (api key protected)"}` (or another valid shape).
-
-```shell
-curl -H "API-Key: yXClypapWNHIifHUWmBIyPFAm" -X GET 'http://localhost:8002/v1/forms'
-```
-
-Expected response: `{"form":"Box","status":"Box (api key protected)"}` (or another valid solid).
-
-### /v2 - Approov Token Protected
-
-This test requires the APPROOV_SECRET entry in the `.env` file to match the Approov secret of the demo account (except for the hello endpoint which is always unprotected). The demo Approov secret can be retrieved using the Approov CLI: `` eval `approov role admin demo` ``, followed by `approov secret -get base64`. Check that the command `approov token -genExample shapes.approov.io` returns an example token as expected before issuing any `curl` command that uses it.
-
-```shell
-curl -X GET 'http://localhost:8002/v2/hello'
-```
-
-Expected response: `{"text":"Hello, World!","status":"Hello, World! (healthy)"}`
-
-```shell
-curl -H "Approov-Token: $(approov token -genExample shapes.approov.io)" -X GET 'http://localhost:8002/v2/shapes'
-```
-
-Expected response: `{"shape":"Rectangle","status":"Rectangle (approoved)"}` (or another valid shape).
-
-```shell
-curl -H "Authorization: bearer TEST" -H "Approov-Token: $(approov token -genExample shapes.approov.io -setDataHashInToken TEST)" -X GET 'http://localhost:8002/v2/forms'
-```
-
-Expected response: `{"form":"Box","status":"Box (approoved)"}` (or another valid solid).
-
-### /v3 - API Key and Approov Token Protected with Token Binding
-
-This test requires the APPROOV_SECRET entry in the `.env` file to match the Approov secret of the demo account (except for the hello endpoint which is always unprotected). The demo Approov secret can be retrieved using the Approov CLI: `` eval `approov role admin demo` ``, followed by `approov secret -get base64`. Check that the command `approov token -genExample shapes.approov.io` returns an example token as expected before issuing any `curl` command that uses it. Note that the `forms` endpoint requires the bound token to be prefixed with `bearer` in the `Authorization` header.
-
-```shell
-curl -X GET 'http://localhost:8002/v3/hello'
-```
-
-Expected response: `{"text":"Hello, World!","status":"Hello, World! (healthy)"}`
-
-```shell
-curl -H "API-Key: yXClypapWNHIifHUWmBIyPFAm" -H "Approov-Token: $(approov token -genExample shapes.approov.io)" -X GET 'http://localhost:8002/v3/shapes'
-```
-
-Expected response: `{"shape":"Rectangle","status":"Rectangle (approoved and api key valid)"}` (or another valid shape).
-
-```shell
-curl -H "API-Key: yXClypapWNHIifHUWmBIyPFAm" -H "Authorization: bearer TEST" -H "Approov-Token: $(approov token -genExample shapes.approov.io -setDataHashInToken TEST)" -X GET 'http://localhost:8002/v3/forms'
-```
-
-Expected response: `{"form":"Box","status":"Box (approoved and api key valid)"}` (or another valid solid).
-
-### /v4 - API Key and Custom Approov Token Protected
-
-```shell
-curl -X GET 'http://localhost:8002/v4/hello'
-```
-
-Expected response: `{"text":"Hello, World!","status":"Hello, World! (healthy)"}`
-
-The `shapes` and `register` endpoints are not testable with `curl` and `approov` because the Approov CLI cannot generate an Approov token with the required custom payload binding.
-
-### /v5 - API Key, Approov Token and HTTP Message Signature Protected
-
-```shell
-curl -X GET 'http://localhost:8002/v5/hello'
-```
-
-Expected response: `{"text":"Hello, World!","status":"Hello, World! (healthy)"}`
-
-An ordinary Approov token without an `ipk` claim exercises the unsigned compatibility path. When an Approov token contains an `ipk` installation public-key claim, the `shapes` request must carry a valid HTTP message signature for that key; this signed path is not directly testable with `curl` and the Approov CLI alone.
-
-## Testing the Approov Shapes Server with the Postman Collection
-
-### Configuring the Environment
-
-In order to use the Postman collection it is necessary to start the shapes server is started with this `.env` file, where `your.domain.com` is replaced by the domain used by your server or `localhost` if you are running the shapes API server on your own machine:
-
-```bash
-# The domain(s) served
-PUBLIC_DOMAIN=your.domain.com
-
-# Enable logging of API calls
-ENABLE_LOGGING=true
-
-# Dummy API Key for the v3 endpoint was generated with:
-# $ strings /dev/urandom | grep -o '[[:alpha:]]' | head -n 25 | tr -d '\n'; echo
-API_KEY=yXClypapWNHIifHUWmBIyPFAm
-
-# Feel free to play with different secrets. For development you can create them with:
-# $ openssl rand -base64 64 | tr -d '\n'; echo
-APPROOV_SECRET=h+CX0tOzdAAR9l15bWAqvq7w9olk66daIH+Xk+IAHhVVHszjDzeGobzNnqyRze3lw/WVyWrc2gZfh3XXfBOmww==
-```
-
-### Testing with Postman
-
-The shapes API can be tested on localhost, a staging or a production server with this [Postman collection](https://raw.githubusercontent.com/approov/postman-collections/master/quickstarts/shapes-api/shapes-api.postman_collection.json).
-
-To use the Postman collection to test a production server, you need to manually update the `Approov-Token` header for each valid request example in the collection with an example token from the Approov CLI:
-
-```bash
-approov token -genExample shapes.approov.io
-```
+- [Approov token claims and policy configuration](https://approov.io/docs/latest/approov-usage-documentation/)
+- [Google Analytics Measurement Protocol](https://developers.google.com/analytics/devguides/collection/protocol/ga4)
+- [HubSpot custom event occurrences](https://developers.hubspot.com/docs/api-reference/latest/events/send-event-data/guide)

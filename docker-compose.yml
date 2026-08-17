@@ -29,6 +29,9 @@ services:
       # No environment variables are inherited from the host environment.
       - .env.default
       - .env
+    environment:
+      # This service receives traffic only through the trusted Traefik network.
+      TRUST_PROXY: "true"
     networks:
       - traefik
     labels:

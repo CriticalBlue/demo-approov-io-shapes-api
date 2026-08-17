@@ -1,117 +1,133 @@
-openapi: 3.0.0
-servers:
-  - description: Approov Shapes Demo Server (v2)
-    url: https://shapes.approov.io/v2
+openapi: 3.1.0
 info:
-  description: A simple API which demonstrates API security using Approov.
-  version: "2.0.0"
   title: Approov Shapes API
-  license:
-    name: Apache-2.0
-    url: https://www.apache.org/licenses/LICENSE-2.0.html
-components:
-  securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
-    ApproovAuth:
-      type: apiKey
-      in: header
-      name: Approov-Token
+  version: 1.0.0
+  description: API for Approov mobile quickstarts.
+servers:
+  - url: https://shapes.approov.io
 paths:
   /hello:
     get:
-      operationId: getHealth
-      summary: Checks connection health
-      description: No Approov protection is required
-      security: []
+      operationId: getHello
+      summary: Confirm the API connection
       responses:
         '200':
-          description: Indicates a healthy connection
+          description: The API is available.
           content:
-            application/json:
+            text/plain:
               schema:
-                type: object
-                properties:
-                  text:
-                    type: string
-                    enum:
-                      - Hello, World!
-                  status:
-                    type: string
-                required:
-                  - text
-                  - status
-  /shapes:
+                type: string
+                const: Hello, World!
+  /v1/shapes:
     get:
-      operationId: getShape
-      summary: Requests a shape
-      description: Requires a valid Approov token
+      operationId: getV1Shape
+      summary: Get a shape with API-key protection
+      parameters:
+        - $ref: '#/components/parameters/Quickstart'
       security:
-        - ApproovAuth: []
+        - ApiKeyAuth: []
       responses:
         '200':
-          description: Returns a random shape name
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  shape:
-                    type: string
-                    enum:
-                      - Circle
-                      - Rectangle
-                      - Square
-                      - Triangle
-                  status:
-                    type: string
-                required:
-                  - shape
-                  - status
+          $ref: '#/components/responses/ShapeResponse'
         '400':
-          description: Indicates a bad request
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-  /forms:
+          $ref: '#/components/responses/AccessError'
+  /v3/shapes:
     get:
-      operationId: getForm
-      summary: Requests a form
-      description: Requires a valid and optionally bound Approov token
+      operationId: getV3Shape
+      summary: Get a shape with API-key and Approov-token protection
+      parameters:
+        - $ref: '#/components/parameters/Quickstart'
       security:
-        - BearerAuth: []
-          ApproovAuth: []
+        - ApiKeyAuth: []
+          ApproovToken: []
       responses:
         '200':
-          description: Returns a random form name
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  form:
-                    type: string
-                    enum:
-                      - Box
-                      - Cone
-                      - Cube
-                      - Sphere
-                  status:
-                    type: string
-                required:
-                  - form
-                  - status
+          $ref: '#/components/responses/ShapeResponse'
         '400':
-          description: Indicates a bad request
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
+          $ref: '#/components/responses/AccessError'
+  /v5/shapes:
+    get:
+      operationId: getV5Shape
+      summary: Get a shape with optional installation message signing
+      description: The server requires a message signature when the valid Approov token contains an `ipk` claim.
+      parameters:
+        - $ref: '#/components/parameters/Quickstart'
+        - $ref: '#/components/parameters/SignatureInput'
+        - $ref: '#/components/parameters/Signature'
+      security:
+        - ApiKeyAuth: []
+          ApproovToken: []
+      responses:
+        '200':
+          $ref: '#/components/responses/ShapeResponse'
+        '400':
+          $ref: '#/components/responses/AccessError'
+components:
+  parameters:
+    Quickstart:
+      name: X-Approov-Quickstart
+      in: header
+      required: false
+      description: Client-supplied quickstart identifier for usage metrics.
+      schema:
+        type: string
+        maxLength: 80
+    SignatureInput:
+      name: Signature-Input
+      in: header
+      required: false
+      description: RFC 9421 signature parameters. Required when the token contains `ipk`.
+      schema:
+        type: string
+    Signature:
+      name: Signature
+      in: header
+      required: false
+      description: RFC 9421 request signature. Required when the token contains `ipk`.
+      schema:
+        type: string
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: Api-Key
+    ApproovToken:
+      type: apiKey
+      in: header
+      name: Approov-Token
+  responses:
+    ShapeResponse:
+      description: A random shape.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Shape'
+    AccessError:
+      description: The access-control data is missing or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Shape:
+      type: object
+      required:
+        - shape
+        - status
+      properties:
+        shape:
+          type: string
+          enum:
+            - Circle
+            - Rectangle
+            - Square
+            - Triangle
+        status:
+          type: string
+    Error:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
