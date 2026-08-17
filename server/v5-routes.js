@@ -1,42 +1,19 @@
 // shapes api server - v5 protected routes
 
-import { debug, readBooleanEnv } from './utils.js';
+import { debug } from './utils.js';
 import Router from '@koa/router';
-// TODO remove API key check?
-import { verifyApiKey } from './api-key.js';
-import { verifyToken } from './auth.js';
+import { recordAuthCheck, requireApiKey, requireApproovToken } from './access-control.js';
 import { verifyHTTPSig } from './http-sig.js';
-
-const ENFORCE_APPROOV = readBooleanEnv('ENFORCE_APPROOV', true);
+import { randomShape } from './shapes.js';
 
 // API key, approov token, and HTTP message signature checks
 
-const abortOnInvalidApiKey = (ctx) => {
-  const { valid, status } = verifyApiKey(ctx);
-
+const abortOnInvalidHTTPSig = (ctx, result) => {
+  const { valid, status } = result;
+  recordAuthCheck(ctx, 'message_signature', result);
   if (!valid) {
-    debug(`api key validation failed: ${status} - error`);
-    ctx.throw(400, status);
-  }
-
-  debug(`api key is valid`);
-}
-
-const abortOnInvalidApproovToken = (ctx, { valid, status }) => {
-  if (!valid) {
-    if (ENFORCE_APPROOV) {
-      debug(`authorization failed: ${status} - error`);
-      ctx.throw(400, status);
-    } else {
-      debug(`authorization failed: ${status} - warning only`);
-    }
-  } else {
-    debug('authorization passed');
-  }
-}
-
-const abortOnInvalidHTTPSig = (ctx, { valid, status }) => {
-  if (!valid) {
+    ctx.state.auth_failure = status;
+    ctx.state.rejectionStage = 'message_signature';
     debug(`HTTP signature validation failed: ${status} - error`);
     ctx.throw(400, status);
   }
@@ -53,11 +30,10 @@ const router = new Router({
 // authorization
 
 router.use('/shapes', async (ctx, next) => {
-  abortOnInvalidApiKey(ctx);
+  requireApiKey(ctx);
 
   // Check the Approov token and extract the token claims
-  const tokenResult = verifyToken(ctx);
-  abortOnInvalidApproovToken(ctx, tokenResult);
+  const tokenResult = requireApproovToken(ctx);
 
   // Check whether the Approov token contains an installation public key (ipk) claim. If it does, we use this to verify
   // the HTTP signature. If it does not, we know that the message has no signature that we should check in the demo
@@ -68,6 +44,17 @@ router.use('/shapes', async (ctx, next) => {
     const msgSignResult = await verifyHTTPSig(ctx, pubKey);
     abortOnInvalidHTTPSig(ctx, msgSignResult);
     ctx.state.messageSignatureVerified = true;
+  } else {
+    ctx.state.auth = { ...ctx.state.auth, message_signature: 'not_required' };
+    ctx.state.authChecks = [
+      ...(ctx.state.authChecks || []),
+      {
+        control: 'message_signature',
+        result: 'not_required',
+        reason: 'Approov token has no ipk claim',
+        enforced: false
+      }
+    ];
   }
 
   await next();
@@ -75,21 +62,8 @@ router.use('/shapes', async (ctx, next) => {
 
 // handle authorized routes
 
-const hello = 'Hello, World!';
-
-router.get('/hello', async ctx => {
-  debug(`text: ${hello}`);
-  ctx.body = {
-    text: hello,
-    status: `${hello} (healthy)`
-  };
-});
-
-const shapes = [ 'Circle', 'Rectangle', 'Square', 'Triangle' ];
-
 router.get('/shapes', async ctx => {
-  const shape = shapes[Math.floor((Math.random() * shapes.length))];
-  debug(`shape: ${shape}`);
+  const shape = randomShape();
   ctx.body = {
     shape,
     status: ctx.state.messageSignatureVerified ?

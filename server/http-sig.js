@@ -51,11 +51,13 @@ const verifyHTTPSig = async (ctx, publicKey) => {
         publicKeyPEM = publicKeyPEMFromClaim(publicKey);
     } catch (error) {
         debug(`Invalid message signature public key: ${error}`);
-        return { valid: false, status: 'invalid message signature public key' };
+        return {
+            valid: false,
+            status: 'invalid message signature public key',
+            error_name: error.name,
+            error_message: error.message
+        };
     }
-    debug(`Public Key ASN.1 Base64: ${publicKey}`);
-    debug(`Public Key PEM: ${publicKeyPEM}`);
-    
     // Check the digest header if it exists (pass the node request object (ctx.req), *not* the Koa request object (ctx.request))
     if (ctx.req.headers['content-digest'] || ctx.req.headers['digest']) {
         const requestBody = ctx.request.rawBody || '';
@@ -77,26 +79,31 @@ const verifyHTTPSig = async (ctx, publicKey) => {
         if (parsedSignature.version !== 'rfc9421') {
             return { valid: false, status: 'unsupported message signature format' };
         }
-        debug(`Parsed Signature: ${JSON.stringify(parsedSignature, null, 2)}`);
     } catch (error) {
-        debug(`Malformed message signature: ${error}`);
-        debug(`Request Headers: ${JSON.stringify(ctx.req.headers, null, 2)}`);
-        return { valid: false, status: 'malformed message signature' };
+      debug(`Malformed message signature: ${error}`);
+        return {
+            valid: false,
+            status: 'malformed message signature',
+            error_name: error.name,
+            error_message: error.message
+        };
     }
 
     // Verify the signature
     try {
         const signatureVerified = await verifyParsedSignature(parsedSignature, publicKeyPEM, (...args) => debug(args));
         if (!signatureVerified) {
-            debug(`Request Headers: ${JSON.stringify(ctx.req.headers, null, 2)}`);
             return { valid: false, status: 'invalid message signature' };
         }
     } catch (error) {
         debug(`Message signature error: ${error}`);
-        debug(`Request Headers: ${JSON.stringify(ctx.req.headers, null, 2)}`);
-        return { valid: false, status: 'message signature error' };
+        return {
+            valid: false,
+            status: 'message signature error',
+            error_name: error.name,
+            error_message: error.message
+        };
     }
-    debug(`Request Headers: ${JSON.stringify(ctx.req.headers, null, 2)}`);
     return { valid: true, status: 'valid HTTP message signature' };
 }
 

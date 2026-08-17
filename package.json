@@ -19,7 +19,6 @@
     "dotenv": "17.4.2",
     "jsonwebtoken": "9.0.3",
     "koa": "2.16.4",
-    "koa-logger": "4.0.0",
     "koa-sslify": "6.0.0"
   },
   "jest": {

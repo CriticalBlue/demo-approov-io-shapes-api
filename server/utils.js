@@ -1,7 +1,5 @@
 // shapes api server utilities
 
-const LOG = (process.env.ENABLE_LOGGING || 'true') === 'true';
-
 const readBooleanEnv = (name, defaultValue) => {
   const value = process.env[name];
   if (value === undefined) {
@@ -20,10 +18,18 @@ const readBooleanEnv = (name, defaultValue) => {
 
 // debugging
 
-const debug = LOG ?
-  (msg) => console.log('      ' + msg) :
-  (msg) => {};
+const debug = (message) => {
+  if (!readBooleanEnv('ENABLE_DEBUG_LOGGING', false)) {
+    return;
+  }
 
-// const debug = (msg) => console.log('      ' + msg);
+  console.log(JSON.stringify({
+    timestamp: new Date().toISOString(),
+    level: 'debug',
+    service: 'shapes-api',
+    event: 'debug',
+    message: String(message)
+  }));
+};
 
 export { debug, readBooleanEnv };

@@ -15,7 +15,7 @@ describe('HTTPS enforcement', () => {
   afterAll(() => new Promise(resolve => server.close(resolve)));
 
   test('redirects an insecure request before routing it', async () => {
-    const response = await request(server).get('/v2/hello');
+    const response = await request(server).get('/hello');
 
     expect(response.status).toBe(301);
     expect(response.headers.location).toMatch(/^https:\/\//);
@@ -23,10 +23,10 @@ describe('HTTPS enforcement', () => {
 
   test('allows a request marked secure by the trusted proxy', async () => {
     const response = await request(server)
-      .get('/v2/hello')
+      .get('/hello')
       .set('X-Forwarded-Proto', 'https');
 
     expect(response.status).toBe(200);
-    expect(response.body.text).toBe('Hello, World!');
+    expect(response.text).toBe('Hello, World!');
   });
 });

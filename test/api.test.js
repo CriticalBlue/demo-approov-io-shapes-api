@@ -1,11 +1,12 @@
-// shapes api server tests
-
-import request from 'supertest';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
+import request from 'supertest';
 
 const approovSecret = crypto.randomBytes(32);
+const apiKey = 'test-api-key';
+
 process.env.APPROOV_SECRET = approovSecret.toString('base64');
+process.env.API_KEY = apiKey;
 process.env.HTTP_PORT = '0';
 process.env.ENFORCE_HTTPS = 'false';
 process.env.ENFORCE_APPROOV = 'true';
@@ -13,168 +14,71 @@ process.env.ENABLE_LOGGING = 'false';
 
 const { httpServer: server } = await import('../server/index.js');
 
-// close the service after all tests completed
 afterAll(() => new Promise(resolve => server.close(resolve)));
 
-const V = '/v2';
-
-describe(`get ${V}/`, () => {
-  test('should return 404 (no root endpoint)', async () => {
-    const response = await request(server).get(`${V}/`);
-    expect(response.status).toEqual(404);
-  });
-});
-
-describe(`get ${V}/hello`, () => {
-  test('should respond with text greeting', async () => {
-    const response = await request(server).get(`${V}/hello`);
-    expect(response.status).toEqual(200);
-    expect(response.type).toEqual('application/json');
-    expect(response.body.text.trim()).toBeTruthy();
-  });
-});
-
-const approovTokenHeader = 'Approov-Token';
-const authenticationHeader = 'Authorization';
-const bindingData = 'BINDING_DATA';
-const payClaim = crypto.createHash('sha256').update(bindingData).digest('base64');
-
 const shapes = [ 'Circle', 'Rectangle', 'Square', 'Triangle' ];
+const approovToken = () => jwt.sign({
+  iss: 'quickstart-test.approov.io',
+  aud: 'shapes.approov.io',
+  sub: 'approov|test-device|com.approov.quickstart'
+}, approovSecret, { expiresIn: '1h' });
 
-describe(`get ${V}/shapes`, () => {
-  test('should respond with shape', async () => {
-    const approovToken = jwt.sign({}, approovSecret, {expiresIn: '1h'});
+test('GET /hello is the single public connection check', async () => {
+  const response = await request(server).get('/hello');
 
-    const response = await request(server)
-    .get(`${V}/shapes`)
-    .set(approovTokenHeader, approovToken);
-    
-    expect(response.status).toEqual(200);
-    expect(response.type).toEqual('application/json');
-    expect(shapes).toContain(response.body.shape);
-  });
-
-  test('should respond with 400 (missing approov-token)', async () => {
-    const response = await request(server)
-    .get(`${V}/shapes`);
-    
-    expect(response.status).toEqual(400);
-  });
-
-  test('should respond with 400 (invalid approov-token)', async () => {
-    const approovToken = jwt.sign({}, Buffer.concat([approovSecret, Buffer.from('?')]), {expiresIn: '1h'});
-
-    const response = await request(server)
-    .get(`${V}/shapes`)
-    .set(approovTokenHeader, approovToken);
-    
-    expect(response.status).toEqual(400);
-  });
-
-  test('should respond with 400 (expired approov-token)', async () => {
-    const approovToken = jwt.sign({}, approovSecret, {expiresIn: -3600});
-
-    const response = await request(server)
-    .get(`${V}/shapes`)
-    .set(approovTokenHeader, approovToken);
-    
-    expect(response.status).toEqual(400);
-  });
-
-  test('should respond with shape (matching claim)', async () => {
-    const approovToken = jwt.sign({'pay': payClaim}, approovSecret, {expiresIn: '1h'});
-
-    const response = await request(server)
-      .get(`${V}/shapes`)
-      .set(authenticationHeader, `Bearer ${bindingData}`)
-      .set(approovTokenHeader, approovToken);
-        
-      expect(response.status).toEqual(200);
-      expect(response.type).toEqual('application/json');
-      expect(shapes).toContain(response.body.shape);
-    });
-
-  test('should respond with shape (mismatching claim)', async () => {
-    const approovToken = jwt.sign({'pay': payClaim + '?'}, approovSecret, {expiresIn: '1h'});
-
-    const response = await request(server)
-      .get(`${V}/shapes`)
-      .set(authenticationHeader, `Bearer X${bindingData}X`)
-      .set(approovTokenHeader, approovToken);
-        
-      expect(response.status).toEqual(200);
-      expect(response.type).toEqual('application/json');
-      expect(shapes).toContain(response.body.shape);
-    });
+  expect(response.status).toBe(200);
+  expect(response.type).toMatch(/^text\/plain/);
+  expect(response.text).toBe('Hello, World!');
+  expect(response.headers['x-request-id']).toBeTruthy();
 });
 
-const forms = [ 'Box', 'Cone', 'Cube', 'Sphere' ];
+test('GET /v1/shapes returns a shape for a valid API key', async () => {
+  const response = await request(server)
+    .get('/v1/shapes')
+    .set('Api-Key', apiKey);
 
-describe(`get ${V}/forms`, () => {
-  test('should respond with form (matching claim)', async () => {
-    const approovToken = jwt.sign({'pay': payClaim}, approovSecret, {expiresIn: '1h'});
+  expect(response.status).toBe(200);
+  expect(shapes).toContain(response.body.shape);
+});
 
-    const response = await request(server)
-      .get(`${V}/forms`)
-      .set(authenticationHeader, `Bearer ${bindingData}`)
-      .set(approovTokenHeader, approovToken);
-    
-    expect(response.status).toEqual(200);
-    expect(response.type).toEqual('application/json');
-    expect(forms).toContain(response.body.form);
-  });
-  
-  test('should respond with form (no claim)', async () => {
-    const approovToken = jwt.sign({}, approovSecret, {expiresIn: '1h'});
+test('GET /v3/shapes returns a shape for a valid API key and Approov token', async () => {
+  const response = await request(server)
+    .get('/v3/shapes')
+    .set('Api-Key', apiKey)
+    .set('Approov-Token', approovToken());
 
-    const response = await request(server)
-      .get(`${V}/forms`)
-      .set(authenticationHeader, `Bearer ${bindingData}`)
-      .set(approovTokenHeader, approovToken);
-    
-    expect(response.status).toEqual(200);
-    expect(response.type).toEqual('application/json');
-    expect(forms).toContain(response.body.form);
-  });
+  expect(response.status).toBe(200);
+  expect(shapes).toContain(response.body.shape);
+});
 
-  test('should respond with 400 (mismatching claim)', async () => {
-    const approovToken = jwt.sign({'pay': payClaim + '?'}, approovSecret, {expiresIn: '1h'});
+test('GET /v5/shapes keeps the unsigned compatibility path when ipk is absent', async () => {
+  const response = await request(server)
+    .get('/v5/shapes')
+    .set('Api-Key', apiKey)
+    .set('Approov-Token', approovToken());
 
-    const response = await request(server)
-      .get(`${V}/forms`)
-      .set(authenticationHeader, `Bearer X${bindingData}X`)
-      .set(approovTokenHeader, approovToken);
-    
-    expect(response.status).toEqual(400);
-  });
+  expect(response.status).toBe(200);
+  expect(shapes).toContain(response.body.shape);
+  expect(response.body.status).toMatch(/without message signature/);
+});
 
-  test('should respond with 400 (missing approov-token)', async () => {
-    const response = await request(server)
-    .get(`${V}/forms`)
-    .set(authenticationHeader, `Bearer ${bindingData}`);
-    
-    expect(response.status).toEqual(400);
-  });
+test.each([
+  '/',
+  '/robots.txt',
+  '/shapes',
+  '/v1/hello',
+  '/v1/forms',
+  '/v2/hello',
+  '/v2/shapes',
+  '/v2/forms',
+  '/v3/hello',
+  '/v3/forms',
+  '/v4/hello',
+  '/v4/shapes',
+  '/v4/register',
+  '/v5/hello'
+])('GET %s is not exposed', async path => {
+  const response = await request(server).get(path);
 
-  test('should respond with 400 (invalid approov-token)', async () => {
-    const approovToken = jwt.sign({}, Buffer.concat([approovSecret, Buffer.from('?')]), {expiresIn: '1h'});
-
-    const response = await request(server)
-    .get(`${V}/forms`)
-    .set(authenticationHeader, `Bearer ${bindingData}`)
-    .set(approovTokenHeader, approovToken);
-    
-    expect(response.status).toEqual(400);
-  });
-
-  test('should respond with 400 (expired approov-token)', async () => {
-    const approovToken = jwt.sign({}, approovSecret, {expiresIn: -3600});
-
-    const response = await request(server)
-    .get(`${V}/forms`)
-    .set(authenticationHeader, `Bearer ${bindingData}`)
-    .set(approovTokenHeader, approovToken);
-    
-    expect(response.status).toEqual(400);
-  });
+  expect(response.status).toBe(404);
 });
